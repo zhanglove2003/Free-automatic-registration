@@ -1,0 +1,53 @@
+name: Bug 报告
+description: 报告一个缺陷
+title: "fix: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请勿在此粘贴任何真实账号、token、API Key 或手机号等敏感信息。
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 问题描述
+      description: 发生了什么?期望是什么?
+      placeholder: 清晰描述缺陷与期望行为
+    validations:
+      required: true
+  - type: dropdown
+    id: module
+    attributes:
+      label: 涉及模块
+      options:
+        - browser (浏览器控制)
+        - sms (接码)
+        - email (邮箱监听)
+        - captcha (打码)
+        - store (存储)
+        - callback (回调)
+        - codex (Codex-Manager 集成)
+        - scheduler (调度)
+        - log / config / ui / 其他
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      description: 1. … 2. … 3. …
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图(已脱敏)
+      description: 粘贴前请删除所有凭据与个人数据
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / 环境
+      placeholder: "应用版本、Windows 版本"
+    validations:
+      required: true

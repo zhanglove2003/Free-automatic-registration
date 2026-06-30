@@ -1,0 +1,83 @@
+name: CI
+
+# 持续集成：对每个 PR 与 main 推送执行 lint / 类型检查 / 测试 / 构建。
+# 目标平台为 Windows 桌面应用（Electron），因此构建在 windows-latest 上运行。
+# 源码（软件源码/package.json）尚未初始化时，相关步骤会自动跳过，保证仓库从第一天起就是绿的。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 同一分支/PR 的并发运行只保留最新一次，节省额度。
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Electron 应用源码所在目录（见《02 项目设计规范》）。
+  APP_DIR: 软件源码
+
+jobs:
+  detect:
+    name: 探测源码是否就绪
+    runs-on: ubuntu-latest
+    outputs:
+      has_app: ${{ steps.check.outputs.has_app }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        shell: bash
+        run: |
+          if [ -f "$APP_DIR/package.json" ]; then
+            echo "has_app=true" >> "$GITHUB_OUTPUT"
+            echo "✅ 检测到 $APP_DIR/package.json，将执行完整 CI。"
+          else
+            echo "has_app=false" >> "$GITHUB_OUTPUT"
+            echo "ℹ️ 未检测到 $APP_DIR/package.json，跳过构建类步骤（源码尚未初始化）。"
+          fi
+
+  build:
+    name: Lint / 类型检查 / 测试 / 构建 (Windows)
+    needs: detect
+    if: needs.detect.outputs.has_app == 'true'
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: 软件源码
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: 软件源码/package-lock.json
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: 类型检查
+        run: npm run typecheck --if-present
+
+      - name: 单元测试
+        run: npm test --if-present
+
+      - name: 构建
+        run: npm run build --if-present
+
+  guard:
+    name: CI 占位（源码未就绪）
+    needs: detect
+    if: needs.detect.outputs.has_app == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "源码尚未初始化，CI 占位通过。初始化 软件源码/package.json 后将自动启用完整流水线。"

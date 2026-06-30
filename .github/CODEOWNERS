@@ -1,0 +1,16 @@
+# 代码所有者 — PR 自动请求对应负责人评审
+# 语法见 https://docs.github.com/articles/about-code-owners
+
+# 默认所有者
+*                          @zhanglove2003
+
+# 文档与规范
+/开发提示文档/              @zhanglove2003
+CONTRIBUTING.md            @zhanglove2003
+
+# CI/工作流(改动需谨慎)
+/.github/                  @zhanglove2003
+
+# 安全敏感模块(凭据/存储/token 抓取)
+/软件源码/**/security/      @zhanglove2003
+/软件源码/**/store/         @zhanglove2003
