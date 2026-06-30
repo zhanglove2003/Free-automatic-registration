@@ -1,0 +1,60 @@
+name: PR 校验
+
+# 校验 PR 标题是否符合 Conventional Commits 规范（见 CONTRIBUTING.md）。
+# 采用 squash 合并时，PR 标题会成为 main 的提交信息，因此标题规范即提交规范。
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  pr-title:
+    name: 校验 PR 标题（Conventional Commits）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # 允许的提交类型
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          # 允许的 scope（对应《02 项目设计规范》的模块划分）。留空也允许（requireScope=false）。
+          scopes: |
+            browser
+            sms
+            email
+            captcha
+            store
+            callback
+            codex
+            cpa
+            scheduler
+            log
+            config
+            ui
+            security
+            deps
+            ci
+            docs
+          requireScope: false
+          # 标题主题（subject）规则：禁止首字母大写开头的 Sentence-case，建议小写祈使句。
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            PR 标题的描述部分「${subject}」不规范。
+            请使用小写开头的祈使句，例如：feat(sms): 增加多国家号码选择策略
+          # 校验整个标题；不只校验单条 commit。
+          validateSingleCommit: false

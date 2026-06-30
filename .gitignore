@@ -1,0 +1,72 @@
+# ===== 依赖 =====
+node_modules/
+软件源码/node_modules/
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+
+# ===== 构建产物 / Electron 打包 =====
+dist/
+out/
+build/
+release/
+*.exe
+*.msi
+*.nsis
+*.AppImage
+软件源码/dist/
+软件源码/out/
+软件源码/release/
+
+# ===== 测试与打包后的运行环境（按需调整）=====
+软件打包后测试环境/
+软件测试环境/runtime/
+
+# ===== 凭据与敏感数据（严禁入库）=====
+# 接码/邮箱/回调密钥、OAuth token、账号库等
+.env
+.env.*
+!.env.example
+*.local
+secrets.json
+credentials.json
+config.local.*
+# 账号数据库（含加密 token，绝不入库）
+*.sqlite
+*.sqlite3
+*.db
+accounts.db*
+data/
+
+# ===== 日志 =====
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===== 测试 / 覆盖率 =====
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# ===== 编辑器 / 系统 =====
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.shared.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 缓存 =====
+.cache/
+.tmp/
+tmp/
+*.tsbuildinfo
+.eslintcache
