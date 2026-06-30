@@ -17,8 +17,8 @@ export interface RegistrationAppApi {
 const api: RegistrationAppApi = {
   snapshot: () => ipcRenderer.invoke('app:snapshot'),
   getSettings: () => ipcRenderer.invoke('settings:get'),
-  updateSettings: (settings) => ipcRenderer.invoke('settings:update', settings),
-  createJob: (input) => ipcRenderer.invoke('job:create', input),
+  updateSettings: (settings) => ipcRenderer.invoke('cmd:saveSettings', settings),
+  createJob: (input) => ipcRenderer.invoke('cmd:start', input),
   checkNetwork: () => ipcRenderer.invoke('network:check'),
   minimizeWindow: () => ipcRenderer.send('window:minimize'),
   toggleMaximizeWindow: () => ipcRenderer.send('window:toggleMaximize'),

@@ -1,17 +1,27 @@
 import { ComplianceBoundaryError } from '../domain/errors.js';
 
 export interface CaptchaChallenge {
-  kind: 'turnstile' | 'funcaptcha' | 'manual';
-  siteKey?: string;
+  type: 'funcaptcha' | 'turnstile';
+  siteKey: string;
   pageUrl: string;
+  extra?: object;
+}
+
+export type CaptchaSolveRequest = CaptchaChallenge;
+
+export interface CaptchaSolveResult {
+  token: string;
 }
 
 export interface CaptchaSolver {
-  solve(challenge: CaptchaChallenge): Promise<string>;
+  readonly name: string;
+  solve(req: CaptchaSolveRequest, timeoutMs: number): Promise<CaptchaSolveResult>;
 }
 
 export class DisabledCaptchaSolver implements CaptchaSolver {
-  async solve(_challenge: CaptchaChallenge): Promise<string> {
+  readonly name = 'disabled';
+
+  async solve(_req: CaptchaSolveRequest, _timeoutMs: number): Promise<CaptchaSolveResult> {
     throw new ComplianceBoundaryError('Captcha solving is disabled in this skeleton; enable only after legal authorization and provider review');
   }
 }

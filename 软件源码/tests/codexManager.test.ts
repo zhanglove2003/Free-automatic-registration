@@ -7,7 +7,7 @@ const account: AccountRecord = {
   email: 'user@example.com',
   password: 'local-only-secret',
   createdAt: '2026-06-30T10:00:00.000Z',
-  status: 'ready',
+  status: 'login_ok',
   tokens: {
     accessToken: 'access-token',
     idToken: 'id-token',

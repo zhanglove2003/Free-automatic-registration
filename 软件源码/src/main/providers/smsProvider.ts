@@ -1,37 +1,35 @@
 import type { SmsSettings } from '../../shared/types.js';
+import { ComplianceBoundaryError } from '../domain/errors.js';
 
 export interface SmsActivation {
-  id: string;
+  orderId: string;
   phone: string;
   country: string;
 }
 
+export type AcquireNumberOptions = SmsSettings;
+
 export interface SmsProvider {
-  checkBalance(): Promise<number>;
-  requestNumber(settings: SmsSettings): Promise<SmsActivation>;
-  pollCode(activationId: string): Promise<string | undefined>;
-  complete(activationId: string): Promise<void>;
-  cancel(activationId: string): Promise<void>;
+  acquireNumber(opts: AcquireNumberOptions): Promise<SmsActivation>;
+  pollCode(orderId: string, timeoutMs: number): Promise<string>;
+  release(orderId: string): Promise<void>;
+  markInvalid(orderId: string): Promise<void>;
 }
 
 export class HeroSmsProvider implements SmsProvider {
-  async checkBalance(): Promise<number> {
-    throw new Error('HeroSMS provider is a skeleton; configure and verify official API before enabling network calls');
+  async acquireNumber(_opts: AcquireNumberOptions): Promise<SmsActivation> {
+    throw new ComplianceBoundaryError('HeroSMS number acquisition is not implemented in the skeleton; configure and verify official API before enabling network calls');
   }
 
-  async requestNumber(_settings: SmsSettings): Promise<SmsActivation> {
-    throw new Error('HeroSMS number request is not implemented in the skeleton');
+  async pollCode(_orderId: string, _timeoutMs: number): Promise<string> {
+    throw new ComplianceBoundaryError('HeroSMS polling is not implemented in the skeleton');
   }
 
-  async pollCode(_activationId: string): Promise<string | undefined> {
-    throw new Error('HeroSMS polling is not implemented in the skeleton');
-  }
-
-  async complete(_activationId: string): Promise<void> {
+  async release(_orderId: string): Promise<void> {
     return;
   }
 
-  async cancel(_activationId: string): Promise<void> {
+  async markInvalid(_orderId: string): Promise<void> {
     return;
   }
 }

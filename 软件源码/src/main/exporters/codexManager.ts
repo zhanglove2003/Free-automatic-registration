@@ -1,5 +1,15 @@
 import type { AccountRecord } from '../../shared/types.js';
 
+export interface CallbackResult {
+  ok: boolean;
+  detail?: string;
+}
+
+export interface CallbackAdapter {
+  readonly name: string;
+  send(record: AccountRecord): Promise<CallbackResult>;
+}
+
 export interface CodexManagerPayload {
   access_token: string;
   id_token?: string;
@@ -44,6 +54,37 @@ export function toCodexManagerJson(account: AccountRecord): string {
   return `${JSON.stringify(toCodexManagerPayload(account), null, 2)}\n`;
 }
 
+export class CodexManagerAdapter implements CallbackAdapter {
+  readonly name = 'codex-manager';
+
+  async send(record: AccountRecord): Promise<CallbackResult> {
+    return {
+      ok: true,
+      detail: toCodexManagerJson(record),
+    };
+  }
+}
+
+const callbackAdapters = new Map<string, CallbackAdapter>();
+
+export function registerCallbackAdapter(adapter: CallbackAdapter): void {
+  callbackAdapters.set(adapter.name, adapter);
+}
+
+export function getCallbackAdapter(name: string): CallbackAdapter {
+  const adapter = callbackAdapters.get(name);
+  if (!adapter) {
+    throw new Error(`Unknown callback adapter: ${name}`);
+  }
+  return adapter;
+}
+
+export function listCallbackAdapters(): string[] {
+  return [...callbackAdapters.keys()];
+}
+
 function emptyToUndefined(value: string | undefined): string | undefined {
   return value?.trim() ? value : undefined;
 }
+
+registerCallbackAdapter(new CodexManagerAdapter());

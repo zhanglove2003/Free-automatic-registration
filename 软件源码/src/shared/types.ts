@@ -1,4 +1,5 @@
 export type TaskStatus = 'queued' | 'running' | 'waiting' | 'ready' | 'failed' | 'cancelled';
+export type AccountStatus = 'created' | 'verified' | 'login_ok' | 'unusable';
 
 export type NumberSelectionStrategy = 'country_first' | 'price_first';
 
@@ -79,7 +80,7 @@ export interface AccountRecord {
   password?: string;
   phone?: string;
   createdAt: string;
-  status: TaskStatus;
+  status: AccountStatus;
   tokens?: OAuthTokens;
   meta?: AccountMeta;
 }
