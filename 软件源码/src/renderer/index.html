@@ -1,0 +1,1049 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="canvas:width" content="1440">
+<meta name="canvas:height" content="900">
+<title>任务调度管理面板</title>
+<style>
+/* ===== Tokens ===== */
+:root {
+  --font-display: 'Segoe UI Variable', 'Inter', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  --font-body: 'Segoe UI Variable', 'Inter', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+
+  /* seed tokens — light mode (default). Nudges patch these. */
+  --seed-bg: #E8E8EC;
+  --seed-fg: #1E1E24;
+  --seed-surface: #FFFFFF;
+  --seed-sidebar: #F0F0F3;
+  --seed-radius: 22px;
+  --seed-glass-alpha: 85%;
+  --seed-chart-emphasis: 0.88;
+
+  /* derived glass layers (seed + alpha via color-mix) */
+  --bg-glass: color-mix(in srgb, var(--seed-bg) var(--seed-glass-alpha), transparent);
+  --sidebar-glass: color-mix(in srgb, var(--seed-sidebar) calc(var(--seed-glass-alpha) + 5%), transparent);
+  --card-glass: color-mix(in srgb, var(--seed-surface) calc(var(--seed-glass-alpha) - 5%), transparent);
+  --bg-solid: var(--seed-bg);
+  --sidebar-solid: var(--seed-sidebar);
+  --card-solid: var(--seed-surface);
+
+  /* derived text + borders (seed-fg + alpha) */
+  --fg: var(--seed-fg);
+  --fg-strong: var(--seed-fg);
+  --muted: color-mix(in srgb, var(--seed-fg) 62%, transparent);
+  --muted-2: color-mix(in srgb, var(--seed-fg) 40%, transparent);
+  --border: color-mix(in srgb, var(--seed-fg) 10%, transparent);
+  --border-strong: color-mix(in srgb, var(--seed-fg) 16%, transparent);
+  --hover: color-mix(in srgb, var(--seed-fg) 6%, transparent);
+  --chrome-divider: color-mix(in srgb, var(--seed-fg) 12%, transparent);
+
+  /* traffic lights (fixed across themes) */
+  --tl-red: #FF6057;
+  --tl-yellow: #FFBD2E;
+  --tl-green: #27CA40;
+
+  /* semantic */
+  --accent: #27CA40;
+  --success: #27CA40;
+  --warn: #FFBD2E;
+  --danger: #FF6057;
+  --info: #6B7A99;
+  --queued: #6B7A99;
+
+  /* theme-independent */
+  --on-accent: #ffffff;
+  --avatar-1: #6B7A99;
+  --avatar-2: #4A5568;
+  --wallpaper-1: #2a2c34;
+  --wallpaper-2: #353841;
+
+  /* shadows — light */
+  --shadow-card: 0 2px 8px rgba(20, 20, 30, 0.06), 0 1px 2px rgba(20, 20, 30, 0.04);
+  --shadow-launch: 0 4px 16px rgba(39, 202, 64, 0.35);
+
+  /* derived radii */
+  --radius-window: calc(var(--seed-radius) - 2px);
+  --radius-card: 22px;
+  --radius-pill: calc(var(--seed-radius) - 4px);
+}
+
+[data-theme="dark"] {
+  /* override seeds only — derived tokens update automatically */
+  --seed-bg: #1E1E24;
+  --seed-fg: #F0F0F3;
+  --seed-surface: #3A3A41;
+  --seed-sidebar: #2C2C33;
+  --seed-glass-alpha: 80%;
+
+  /* shadows — dark */
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.22), 0 1px 2px rgba(0, 0, 0, 0.14);
+  --shadow-launch: 0 4px 16px rgba(39, 202, 64, 0.30);
+}
+
+/* ===== Reset ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+input { font: inherit; color: inherit; }
+table { border-collapse: collapse; width: 100%; }
+
+/* ===== Transparent host for rounded desktop window corners ===== */
+html, body { height: 100%; overflow: hidden; background: transparent; }
+body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fg);
+  background: transparent;
+  padding: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+/* ===== Window (Mica base layer) ===== */
+.window {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  overflow: hidden;
+  background-color: var(--bg-solid);
+  box-shadow: none;
+  border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  position: relative;
+  min-width: 0;
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .window {
+    background-color: var(--bg-glass);
+    backdrop-filter: blur(30px) saturate(1.5);
+    -webkit-backdrop-filter: blur(30px) saturate(1.5);
+  }
+}
+
+/* ===== Title bar ===== */
+.titlebar {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.18));
+  border-bottom: 1px solid var(--chrome-divider);
+  user-select: none;
+  position: relative;
+  z-index: 2;
+  -webkit-app-region: drag;
+}
+[data-theme="dark"] .titlebar {
+  background: linear-gradient(180deg, rgba(42, 42, 49, 0.50), rgba(30, 30, 36, 0.28));
+}
+.titlebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+.traffic-lights {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+.tl {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.20),
+    inset 0 1px 1px rgba(255, 255, 255, 0.35),
+    0 1px 2px rgba(0, 0, 0, 0.10);
+  transition: filter 0.15s;
+  -webkit-app-region: no-drag;
+}
+[data-theme="dark"] .tl {
+  border-color: rgba(0, 0, 0, 0.32);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
+    inset 0 1px 1px rgba(255, 255, 255, 0.18),
+    0 1px 2px rgba(0, 0, 0, 0.30);
+}
+.tl:hover { filter: brightness(1.08); }
+.tl-red { background: var(--tl-red); }
+.tl-yellow { background: var(--tl-yellow); }
+.tl-green { background: var(--tl-green); }
+.tl svg {
+  width: 7px;
+  height: 7px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  color: rgba(0, 0, 0, 0.55);
+}
+.traffic-lights:hover .tl svg { opacity: 1; }
+
+/* ===== Window body ===== */
+.window-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0));
+}
+[data-theme="dark"] .window-body {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+}
+
+/* ===== Sidebar (second-layer Acrylic) ===== */
+.sidebar {
+  width: 76px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0 12px;
+  background-color: var(--sidebar-solid);
+  border-right: 1px solid var(--border);
+  border-top-right-radius: 18px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  -webkit-app-region: drag;
+  user-select: none;
+  -webkit-user-select: none;
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sidebar {
+    background-color: var(--sidebar-glass);
+    backdrop-filter: blur(40px) saturate(1.6);
+    -webkit-backdrop-filter: blur(40px) saturate(1.6);
+  }
+}
+.nav-items {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  -webkit-app-region: no-drag;
+}
+.nav-items.is-reordering {
+  gap: 5px;
+}
+.nav-item {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--muted);
+  position: relative;
+  -webkit-app-region: no-drag;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+.nav-item[draggable="true"] { cursor: grab; }
+.nav-item[draggable="true"]:active { cursor: grabbing; }
+.nav-item.is-dragging {
+  opacity: 0.36;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--fg) 8%, transparent);
+}
+.nav-item.drag-over {
+  background: var(--hover);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #0A84FF 28%, var(--border-strong)), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.nav-drop-indicator {
+  width: 52px;
+  height: 5px;
+  border-radius: 999px;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(10, 132, 255, 0.18), rgba(10, 132, 255, 0.82), rgba(10, 132, 255, 0.18));
+  box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.12), 0 5px 14px rgba(10, 132, 255, 0.20);
+  flex: 0 0 5px;
+}
+[data-theme="dark"] .nav-drop-indicator {
+  background: linear-gradient(90deg, rgba(142, 197, 255, 0.18), rgba(142, 197, 255, 0.88), rgba(142, 197, 255, 0.18));
+  box-shadow: 0 0 0 1px rgba(142, 197, 255, 0.18), 0 5px 16px rgba(10, 132, 255, 0.26);
+}
+.nav-item:hover {
+  background: var(--hover);
+  color: var(--fg);
+  box-shadow: 0 0 0 1px var(--border-strong), 0 2px 10px color-mix(in srgb, var(--fg) 10%, transparent);
+}
+.nav-item:hover svg { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--fg) 18%, transparent)); }
+.nav-item svg { width: 20px; height: 20px; }
+.nav-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+.nav-item.active {
+  color: var(--fg);
+  background: var(--hover);
+}
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--fg-strong);
+}
+
+/* Launch button — Apple-style primary action */
+.nav-launch {
+  width: 60px;
+  height: 72px;
+  border-radius: 22px;
+  padding: 8px 6px;
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--fg-strong);
+  box-shadow:
+    0 10px 26px rgba(31, 41, 55, 0.12),
+    0 1px 2px rgba(31, 41, 55, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  margin-bottom: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  gap: 7px;
+  touch-action: manipulation;
+  transition: transform 0.18s ease-out, box-shadow 0.18s ease-out, background 0.18s ease-out, border-color 0.18s ease-out;
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .nav-launch {
+    background: rgba(255, 255, 255, 0.62);
+    backdrop-filter: blur(24px) saturate(1.7);
+    -webkit-backdrop-filter: blur(24px) saturate(1.7);
+  }
+}
+[data-theme="dark"] .nav-launch {
+  background: rgba(44, 44, 50, 0.72);
+  color: var(--fg-strong);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.36),
+    0 1px 2px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.13);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-theme="dark"] .nav-launch {
+    background: rgba(44, 44, 50, 0.62);
+  }
+}
+.nav-launch:hover {
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--fg-strong);
+  transform: translateY(-1px);
+  box-shadow:
+    0 14px 30px rgba(31, 41, 55, 0.15),
+    0 2px 4px rgba(31, 41, 55, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  border-color: rgba(255, 255, 255, 0.92);
+}
+[data-theme="dark"] .nav-launch:hover {
+  background: rgba(58, 58, 66, 0.84);
+  border-color: rgba(255, 255, 255, 0.20);
+  box-shadow:
+    0 15px 32px rgba(0, 0, 0, 0.42),
+    0 2px 5px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+.nav-launch:focus-visible {
+  outline: 3px solid color-mix(in srgb, #0A84FF 34%, white);
+  outline-offset: 3px;
+}
+.nav-launch:active {
+  transform: translateY(0) scale(0.985);
+  background: rgba(246, 247, 249, 0.86);
+}
+[data-theme="dark"] .nav-launch:active {
+  background: rgba(38, 38, 44, 0.90);
+}
+.apple-launch-symbol {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  background: linear-gradient(180deg, #34C759, #30B450);
+  box-shadow:
+    0 5px 12px rgba(52, 199, 89, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+.nav-launch svg { width: 17px; height: 17px; margin-left: 1px; }
+.nav-launch .nav-label {
+  color: color-mix(in srgb, var(--fg-strong) 86%, transparent);
+  font-size: 11px;
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+[data-theme="dark"] .nav-launch .nav-label {
+  color: rgba(246, 247, 251, 0.92);
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 4px;
+  -webkit-app-region: no-drag;
+}
+.theme-toggle {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: background 0.15s, color 0.15s;
+}
+.theme-toggle:hover { background: var(--hover); color: var(--fg); }
+.theme-toggle svg { width: 18px; height: 18px; }
+.icon-moon { display: none; }
+[data-theme="dark"] .icon-sun { display: none; }
+[data-theme="dark"] .icon-moon { display: block; }
+
+/* ===== Content (floating glass cards layer) ===== */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.content::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.content-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+.page-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--fg-strong);
+}
+.page-subtitle {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  margin-top: 4px;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--card-glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  width: 220px;
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .search {
+    backdrop-filter: blur(16px) saturate(1.3);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  }
+}
+.search svg { width: 16px; height: 16px; color: var(--muted); flex-shrink: 0; }
+.search input {
+  border: none;
+  outline: none;
+  background: none;
+  font-size: 13px;
+  width: 100%;
+  color: var(--fg);
+}
+.search input::placeholder { color: var(--muted-2); }
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--avatar-1), var(--avatar-2));
+  color: var(--on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--border-strong);
+  flex-shrink: 0;
+}
+
+/* ===== Stats row ===== */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.stat-card {
+  background-color: var(--card-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-card);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .stat-card {
+    background-color: var(--card-glass);
+    backdrop-filter: blur(20px) saturate(1.3);
+    -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  }
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+}
+.stat-value {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--fg-strong);
+}
+.stat-delta {
+  font-size: 12px;
+  margin-top: 6px;
+  letter-spacing: 0.01em;
+}
+.stat-success { color: var(--success); }
+.stat-danger { color: var(--danger); }
+.stat-muted { color: var(--muted); }
+
+/* ===== Content grid ===== */
+.content-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 14px;
+}
+.card {
+  background-color: var(--card-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .card {
+    background-color: var(--card-glass);
+    backdrop-filter: blur(20px) saturate(1.3);
+    -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  }
+}
+.card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 8px;
+}
+.card-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--fg-strong);
+}
+.card-meta {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+/* ===== Job table ===== */
+.job-table { font-size: 13px; }
+.job-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.job-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+}
+.job-table tr:last-child td { border-bottom: none; }
+.job-table tbody tr { transition: background 0.12s; }
+.job-table tbody tr:hover td { background: var(--hover); }
+.job-name { font-weight: 500; color: var(--fg-strong); }
+.job-time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.job-duration { font-variant-numeric: tabular-nums; color: var(--fg); }
+.job-actions { white-space: nowrap; text-align: right; width: 1%; }
+.action-btn {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  margin-left: 6px;
+}
+.action-btn:hover {
+  background: var(--hover);
+  color: var(--fg);
+  border-color: var(--border-strong);
+}
+.action-btn.action-retry {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 32%, transparent);
+}
+.action-btn.action-retry:hover {
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 48%, transparent);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+.status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.status-running { color: var(--success); }
+.status-queued { color: var(--queued); }
+.status-completed { color: var(--muted); }
+.status-failed { color: var(--danger); }
+.status-running::before { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* ===== GPT network status — Apple settings style ===== */
+.network-card { display: flex; flex-direction: column; min-height: 222px; }
+.apple-network-card {
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  box-shadow:
+    0 16px 42px rgba(31, 41, 55, 0.10),
+    0 1px 2px rgba(31, 41, 55, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .apple-network-card {
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: blur(26px) saturate(1.65);
+    -webkit-backdrop-filter: blur(26px) saturate(1.65);
+  }
+}
+[data-theme="dark"] .apple-network-card {
+  background: rgba(38, 38, 44, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.40),
+    0 1px 2px rgba(0, 0, 0, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-theme="dark"] .apple-network-card {
+    background: rgba(38, 38, 44, 0.62);
+  }
+}
+.network-overview {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  min-height: 138px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.apple-status-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  color: #0A84FF;
+  background: linear-gradient(180deg, rgba(10, 132, 255, 0.16), rgba(10, 132, 255, 0.08));
+  box-shadow: inset 0 0 0 1px rgba(10, 132, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+[data-theme="dark"] .apple-status-icon {
+  color: #8EC5FF;
+  background: linear-gradient(180deg, rgba(10, 132, 255, 0.24), rgba(10, 132, 255, 0.10));
+  box-shadow: inset 0 0 0 1px rgba(142, 197, 255, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.apple-status-icon svg { width: 23px; height: 23px; }
+.apple-status-detail {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 12px;
+  align-items: center;
+}
+.network-status-title {
+  grid-column: 1;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--fg-strong);
+}
+.network-status-note {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.apple-status-pill {
+  grid-column: 2;
+  grid-row: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  color: color-mix(in srgb, #0A84FF 82%, var(--fg-strong));
+  background: rgba(10, 132, 255, 0.10);
+  border: 1px solid rgba(10, 132, 255, 0.16);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+[data-theme="dark"] .apple-status-pill {
+  color: #8EC5FF;
+  background: rgba(10, 132, 255, 0.16);
+  border-color: rgba(142, 197, 255, 0.22);
+}
+.apple-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.network-overview[data-network-state="ok"] .apple-status-icon {
+  color: #34C759;
+  background: linear-gradient(180deg, rgba(52, 199, 89, 0.16), rgba(52, 199, 89, 0.08));
+  box-shadow: inset 0 0 0 1px rgba(52, 199, 89, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+[data-theme="dark"] .network-overview[data-network-state="ok"] .apple-status-icon {
+  color: #7EE08E;
+  background: linear-gradient(180deg, rgba(52, 199, 89, 0.24), rgba(52, 199, 89, 0.10));
+  box-shadow: inset 0 0 0 1px rgba(126, 224, 142, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.network-overview[data-network-state="ok"] .apple-status-pill {
+  color: color-mix(in srgb, #248A3D 86%, var(--fg-strong));
+  background: rgba(52, 199, 89, 0.11);
+  border-color: rgba(52, 199, 89, 0.18);
+}
+[data-theme="dark"] .network-overview[data-network-state="ok"] .apple-status-pill {
+  color: #7EE08E;
+  background: rgba(52, 199, 89, 0.16);
+  border-color: rgba(126, 224, 142, 0.22);
+}
+.network-overview[data-network-state="error"] .apple-status-icon {
+  color: #FF3B30;
+  background: linear-gradient(180deg, rgba(255, 59, 48, 0.15), rgba(255, 59, 48, 0.07));
+  box-shadow: inset 0 0 0 1px rgba(255, 59, 48, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+[data-theme="dark"] .network-overview[data-network-state="error"] .apple-status-icon {
+  color: #FF9F98;
+  background: linear-gradient(180deg, rgba(255, 69, 58, 0.24), rgba(255, 69, 58, 0.10));
+  box-shadow: inset 0 0 0 1px rgba(255, 159, 152, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.network-overview[data-network-state="error"] .apple-status-pill {
+  color: color-mix(in srgb, #D70015 84%, var(--fg-strong));
+  background: rgba(255, 59, 48, 0.10);
+  border-color: rgba(255, 59, 48, 0.18);
+}
+[data-theme="dark"] .network-overview[data-network-state="error"] .apple-status-pill {
+  color: #FF9F98;
+  background: rgba(255, 69, 58, 0.16);
+  border-color: rgba(255, 159, 152, 0.22);
+}
+
+/* ===== Activity log ===== */
+.activity-card { padding-bottom: 8px; }
+.activity-list { list-style: none; display: flex; flex-direction: column; }
+.activity-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  align-items: flex-start;
+}
+.activity-item:last-child { border-bottom: none; }
+.activity-time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  width: 44px;
+  padding-top: 1px;
+}
+.activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+.activity-dot.success { background: var(--success); }
+.activity-dot.danger { background: var(--danger); }
+.activity-dot.info { background: var(--info); }
+.activity-text { color: var(--fg); flex: 1; }
+.activity-text strong { font-weight: 500; color: var(--fg-strong); }
+.activity-reason { color: var(--muted); font-size: 12px; }
+
+/* ===== Responsive ===== */
+@media (max-width: 1100px) {
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .content-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  body { padding: 0; }
+  .sidebar { width: 64px; }
+  .content { padding: 16px; }
+  .header-actions .user-avatar { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+</style>
+</head>
+<body>
+<div class="window" data-component="Window" data-od-id="main-window">
+  <header class="titlebar" data-component="Title Bar" data-od-id="titlebar">
+    <div class="titlebar-title">任务调度管理面板</div>
+    <div class="traffic-lights" role="group" aria-label="窗口控制">
+      <button class="tl tl-red" aria-label="关闭窗口" type="button">
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"/></svg>
+      </button>
+      <button class="tl tl-yellow" aria-label="最小化" type="button">
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 6h6"/></svg>
+      </button>
+      <button class="tl tl-green" aria-label="最大化" type="button">
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5L6 3l2.5 2M3.5 7L6 9l2.5-2"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="window-body">
+    <aside class="sidebar" data-component="Sidebar" data-od-id="sidebar" aria-label="主导航">
+      <div class="nav-items" aria-label="可排序主导航">
+        <button class="nav-item nav-launch apple-launch" type="button" aria-label="启动任务" title="启动任务">
+          <span class="apple-launch-symbol" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" fill="currentColor"/></svg>
+          </span>
+          <span class="nav-label">启动任务</span>
+        </button>
+        <button class="nav-item active" type="button" aria-label="仪表盘" aria-current="page" title="仪表盘" data-nav-id="dashboard" draggable="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 14a9 9 0 0 1 18 0"/><path d="M12 14l3.5-3.5"/><circle cx="12" cy="14" r="1.4" fill="currentColor" stroke="none"/><path d="M3 14h2M19 14h2"/></svg>
+          <span class="nav-label">仪表盘</span>
+        </button>
+        <button class="nav-item" type="button" aria-label="设置" title="设置" data-nav-id="settings" draggable="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.5M12 19v2.5M4.5 4.5l1.8 1.8M17.7 17.7l1.8 1.8M2.5 12H5M19 12h2.5M4.5 19.5l1.8-1.8M17.7 6.3l1.8-1.8"/></svg>
+          <span class="nav-label">设置</span>
+        </button>
+        <button class="nav-item" type="button" aria-label="日志" title="日志" data-nav-id="logs" draggable="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M10 12h6M10 16h6M10 8h2"/></svg>
+          <span class="nav-label">日志</span>
+        </button>
+      </div>
+      <div class="sidebar-footer">
+        <button class="theme-toggle" type="button" aria-label="切换白夜模式" title="切换白夜模式">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6 6L4.5 4.5M19.5 19.5L18 18M6 18l-1.5 1.5M19.5 4.5L18 6"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <main class="content" data-component="Main Content" data-od-id="main-content">
+      <div class="content-header">
+        <div>
+          <h1 class="page-title">仪表盘</h1>
+          <p class="page-subtitle">任务/作业调度总览 · 2026-06-29 今日</p>
+        </div>
+        <div class="header-actions">
+          <div class="user-avatar" title="运维管理员">运</div>
+        </div>
+      </div>
+
+      <section class="stats-row" data-component="Stats" data-od-id="stats" aria-label="任务统计">
+        <div class="stat-card">
+          <div class="stat-label">运行中</div>
+          <div class="stat-value">3</div>
+          <div class="stat-delta stat-success">较昨日同时段 +1</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">排队</div>
+          <div class="stat-value">7</div>
+          <div class="stat-delta stat-muted">预计 15:00 前清空</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">已完成</div>
+          <div class="stat-value">142</div>
+          <div class="stat-delta stat-success">较昨日 +18</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">失败</div>
+          <div class="stat-value">2</div>
+          <div class="stat-delta stat-danger">需关注</div>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <div class="card job-list-card" data-component="Job List" data-od-id="job-list">
+          <div class="card-header">
+            <h2 class="card-title">作业列表</h2>
+            <span class="card-meta">6 项 · 按调度时间排序</span>
+          </div>
+          <table class="job-table" aria-label="作业列表">
+            <thead>
+              <tr><th scope="col">作业名</th><th scope="col">状态</th><th scope="col">调度时间</th><th scope="col">耗时</th><th scope="col" class="job-actions">操作</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="job-name">数据备份-DB01</td><td><span class="status status-running">运行中</span></td><td class="job-time">14:30</td><td class="job-duration">12m 34s</td><td class="job-actions"><button class="action-btn" type="button">日志</button></td></tr>
+              <tr><td class="job-name">报表生成-日报</td><td><span class="status status-queued">排队</span></td><td class="job-time">15:00</td><td class="job-duration">待运行</td><td class="job-actions"><button class="action-btn" type="button">日志</button></td></tr>
+              <tr><td class="job-name">索引重建-ES集群</td><td><span class="status status-running">运行中</span></td><td class="job-time">14:15</td><td class="job-duration">27m 34s</td><td class="job-actions"><button class="action-btn" type="button">日志</button></td></tr>
+              <tr><td class="job-name">日志清理-归档</td><td><span class="status status-completed">已完成</span></td><td class="job-time">13:00</td><td class="job-duration">4m 52s</td><td class="job-actions"><button class="action-btn" type="button">日志</button></td></tr>
+              <tr><td class="job-name">同步任务-用户标签</td><td><span class="status status-failed">失败</span></td><td class="job-time">12:45</td><td class="job-duration">2m 18s</td><td class="job-actions"><button class="action-btn action-retry" type="button" title="重新执行该作业">重试</button><button class="action-btn" type="button">日志</button></td></tr>
+              <tr><td class="job-name">缓存预热-首页</td><td><span class="status status-completed">已完成</span></td><td class="job-time">12:30</td><td class="job-duration">1m 09s</td><td class="job-actions"><button class="action-btn" type="button">日志</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card network-card" data-component="GPT Network Status" data-od-id="gpt-network">
+          <div class="card-header">
+            <h2 class="card-title">GPT 网络连接</h2>
+            <span class="card-meta">自动检测</span>
+          </div>
+          <div class="network-overview apple-network-card" data-network-state="checking" aria-live="polite" aria-label="GPT 网络连接状态">
+            <div class="apple-status-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5 12.2a10.5 10.5 0 0 1 14 0"/><path d="M8.5 15.6a5.5 5.5 0 0 1 7 0"/></svg>
+            </div>
+            <div class="apple-status-detail">
+              <div class="network-status-title">自动检测中</div>
+              <div class="apple-status-pill"><span class="apple-status-dot" aria-hidden="true"></span><span class="apple-status-pill-text">自动检测</span></div>
+              <div class="network-status-note">正在确认当前网络是否可以连接 GPT 服务</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card activity-card" data-component="Activity Log" data-od-id="activity-log" aria-label="最近活动日志">
+        <div class="card-header">
+          <h2 class="card-title">最近活动</h2>
+          <span class="card-meta">实时</span>
+        </div>
+        <ul class="activity-list">
+          <li class="activity-item">
+            <span class="activity-time">14:42</span>
+            <span class="activity-dot info" aria-hidden="true"></span>
+            <span class="activity-text"><strong>数据备份-DB01</strong> 已运行 12m 34s，进度 68%</span>
+          </li>
+          <li class="activity-item">
+            <span class="activity-time">14:30</span>
+            <span class="activity-dot success" aria-hidden="true"></span>
+            <span class="activity-text"><strong>数据备份-DB01</strong> 启动</span>
+          </li>
+          <li class="activity-item">
+            <span class="activity-time">14:15</span>
+            <span class="activity-dot success" aria-hidden="true"></span>
+            <span class="activity-text"><strong>索引重建-ES集群</strong> 启动</span>
+          </li>
+          <li class="activity-item">
+            <span class="activity-time">13:00</span>
+            <span class="activity-dot success" aria-hidden="true"></span>
+            <span class="activity-text"><strong>日志清理-归档</strong> 完成，释放空间 2.3 GB</span>
+          </li>
+          <li class="activity-item">
+            <span class="activity-time">12:45</span>
+            <span class="activity-dot danger" aria-hidden="true"></span>
+            <span class="activity-text"><strong>同步任务-用户标签</strong> 失败 <span class="activity-reason">· 连接超时（等待 30s）</span></span>
+          </li>
+          <li class="activity-item">
+            <span class="activity-time">12:30</span>
+            <span class="activity-dot success" aria-hidden="true"></span>
+            <span class="activity-text"><strong>缓存预热-首页</strong> 完成</span>
+          </li>
+        </ul>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+  // Theme toggle (in-memory only, no storage APIs)
+  (function() {
+    var toggle = document.querySelector('.theme-toggle');
+    if (!toggle) return;
+    var root = document.documentElement;
+    toggle.addEventListener('click', function() {
+      var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      root.setAttribute('data-theme', next);
+      toggle.setAttribute('aria-label', next === 'light' ? '切换到黑夜模式' : '切换到白天模式');
+    });
+  })();
+
+</script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
+
