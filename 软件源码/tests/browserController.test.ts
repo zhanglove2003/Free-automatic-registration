@@ -170,7 +170,7 @@ describe('ElectronBrowserController', () => {
     expect(controller.listSessions()[0]).toMatchObject({ url: 'https://api.snowovo.cc.cd/dashboard' });
   });
 
-  it('records the requested URL when an embedded new-window navigation fails', async () => {
+  it('keeps the previous URL when an embedded new-window navigation fails', async () => {
     const { controller, views } = createHarness();
 
     await controller.createSession('utility-xiaopozhan', 'https://api.snowovo.cc.cd/login');
@@ -183,7 +183,7 @@ describe('ElectronBrowserController', () => {
       'https://api.snowovo.cc.cd/login',
       'https://api.snowovo.cc.cd/dashboard',
     ]);
-    expect(controller.listSessions()[0]).toMatchObject({ url: 'https://api.snowovo.cc.cd/dashboard' });
+    expect(controller.listSessions()[0]).toMatchObject({ url: 'https://api.snowovo.cc.cd/login' });
   });
 
   it('exposes direct session handle lookup without sorting all sessions', async () => {

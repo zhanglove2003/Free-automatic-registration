@@ -229,8 +229,8 @@ export class ElectronBrowserController implements BrowserController {
   private keepNewWindowsInCurrentView(taskId: string, view: BrowserViewLike): void {
     view.webContents.setWindowOpenHandler?.(({ url }) => {
       if (isBrowserNavigableUrl(url)) {
-        this.updateSession(taskId, { url });
         void view.webContents.loadURL(url)
+          .then(() => this.updateSession(taskId, { url }))
           .catch((error) => {
             console.warn(`Embedded browser navigation failed for ${taskId}`, error);
           });

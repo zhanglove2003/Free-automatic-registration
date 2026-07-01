@@ -35,3 +35,4 @@
 - Verified the focused tests failed before implementation, then passed after implementation.
 - Re-verified PR review fixes with `npm test -- tests/browserController.test.ts tests/monitoring.test.ts tests/windowChrome.test.ts`, `npm test`, `npm run typecheck`, and `npm run build`.
 - Replaced the popup navigation no-op catch with diagnostic logging, then re-ran `npm test -- tests/browserController.test.ts`, `npm run typecheck`, `npm test`, and `npm run build`.
+- Follow-up review fix: moved popup URL summary updates back into the successful `loadURL().then(...)` path so failed embedded new-window navigations keep the previous actual URL. Verified with `npm test -- tests/browserController.test.ts`, `npm run typecheck`, `npm test`, and `npm run build`.
