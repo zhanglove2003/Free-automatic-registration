@@ -1,4 +1,5 @@
 import type { AccountRecord, AppSettings, TaskStatus } from '../../shared/types.js';
+import type { BrowserSessionSummary } from '../browser/browserController.js';
 
 export interface TaskLogEntry {
   taskId: string;
@@ -30,4 +31,5 @@ export interface AppSnapshot {
   stats: DashboardStats;
   tasks: RegistrationTask[];
   recentLogs: TaskLogEntry[];
+  browserSessions: BrowserSessionSummary[];
 }

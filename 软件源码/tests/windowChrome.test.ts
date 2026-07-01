@@ -44,7 +44,7 @@ describe('custom frameless window chrome', () => {
   it('wires custom traffic-light buttons during renderer boot', () => {
     const app = readProjectFile('src/renderer/app.ts');
 
-    expect(app).toMatch(/async function boot\(\): Promise<void> \{\s*wireWindowControls\(\);\s*wireLaunchButton\(\);/m);
+    expect(app).toMatch(/async function boot\(\): Promise<void> \{\s*wireWindowControls\(\);\s*wireThemeToggle\(\);\s*wireLaunchButton\(\);/m);
     expect(app).toContain("'.tl-red'");
     expect(app).toContain('closeWindow()');
     expect(app).toContain("'.tl-yellow'");
@@ -88,7 +88,7 @@ describe('custom frameless window chrome', () => {
     expect(html).toMatch(/\.nav-item\.is-dragging\s*\{[^}]*opacity:\s*0\.36;/s);
     expect(html).toMatch(/\.nav-item\.drag-over\s*\{[^}]*background:\s*var\(--hover\);/s);
     expect(html).toContain('.nav-drop-indicator');
-    expect(app).toMatch(/async function boot\(\): Promise<void> \{\s*wireWindowControls\(\);\s*wireLaunchButton\(\);\s*wireSortableSidebar\(\);/m);
+    expect(app).toMatch(/async function boot\(\): Promise<void> \{\s*wireWindowControls\(\);\s*wireThemeToggle\(\);\s*wireLaunchButton\(\);\s*wireSortableSidebar\(\);/m);
     expect(app).toContain('function wireSortableSidebar(): void');
     expect(app).toContain("'.nav-items'");
     expect(app).toContain("'dragstart'");
@@ -209,6 +209,18 @@ describe('custom frameless window chrome', () => {
     expect(app).toContain('checkNetwork');
     expect(app).toContain("'.apple-status-pill-text'");
     expect(network).not.toContain("'direct://'");
+  });
+
+  it('registers the app renderer window explicitly for snapshot broadcasts', () => {
+    const main = readProjectFile('src/main/main.ts');
+    const ipc = readProjectFile('src/main/ipc.ts');
+
+    expect(main).toContain("import { registerAppRendererWindow, registerIpc } from './ipc.js';");
+    expect(main).toContain('registerAppRendererWindow(mainWindow);');
+    expect(ipc).toContain('const appRendererWebContentsIds = new Set<number>();');
+    expect(ipc).toContain('export function registerAppRendererWindow(window: BrowserWindow): void');
+    expect(ipc).toContain('appRendererWebContentsIds.has(window.webContents.id)');
+    expect(ipc).not.toContain("getURL().includes('/renderer/index.html')");
   });
 
 });
