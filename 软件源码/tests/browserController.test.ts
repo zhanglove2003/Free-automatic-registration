@@ -22,6 +22,9 @@ class FakeWebContents {
       this.debugger.attached = true;
       this.debugger.attachVersion = version ?? '';
     },
+    detach: () => {
+      this.debugger.attached = false;
+    },
     sendCommand: async (command: string, params?: unknown) => {
       this.debugger.commands.push({ command, params });
     },
@@ -154,6 +157,24 @@ describe('ElectronBrowserController', () => {
     expect(views[0].webContents.loadedUrls).toEqual(['https://chatgpt.com/']);
   });
 
+  it('cleans up a session when the initial URL fails to load', async () => {
+    const views: FakeBrowserView[] = [];
+    const controller = new ElectronBrowserController((options) => {
+      const view = new FakeBrowserView(options as Record<string, unknown>);
+      view.webContents.rejectNextLoadUrl = 'https://api.snowovo.cc.cd/login';
+      views.push(view);
+      return view;
+    });
+
+    await expect(controller.createSession('utility-xiaopozhan', 'https://api.snowovo.cc.cd/login')).rejects.toThrow(
+      'navigation failed: https://api.snowovo.cc.cd/login',
+    );
+
+    expect(views[0].webContents.destroyed).toBe(true);
+    expect(controller.listSessions()).toEqual([]);
+    expect(controller.getSessionHandle('utility-xiaopozhan')).toBeUndefined();
+  });
+
   it('keeps new-window links inside the same Chromium view', async () => {
     const { controller, views } = createHarness();
 
@@ -229,6 +250,27 @@ describe('ElectronBrowserController', () => {
     });
   });
 
+  it('does not apply color scheme emulation before a blank session navigates', async () => {
+    const { controller, views } = createHarness();
+
+    await controller.createSession('utility-xiaopozhan');
+
+    expect(views[0].webContents.debugger.commands).toEqual([]);
+    expect(views[0].webContents.debugger.attached).toBe(false);
+  });
+
+  it('releases the debugger after applying color scheme emulation', async () => {
+    const { controller, views } = createHarness();
+
+    await controller.createSession('utility-xiaopozhan', 'https://api.snowovo.cc.cd/login');
+
+    expect(views[0].webContents.debugger.commands).toContainEqual({
+      command: 'Emulation.setEmulatedMedia',
+      params: { features: [{ name: 'prefers-color-scheme', value: 'light' }] },
+    });
+    expect(views[0].webContents.debugger.attached).toBe(false);
+  });
+
   it('navigates an existing session using the same view', async () => {
     const { controller, views } = createHarness();
     const handle = await controller.createSession('task-123');
@@ -237,6 +279,23 @@ describe('ElectronBrowserController', () => {
 
     expect(views).toHaveLength(1);
     expect(views[0].webContents.loadedUrls).toEqual(['https://auth.openai.com/']);
+  });
+
+  it('navigates utility browser sessions through CDP so embedded tool pages load reliably', async () => {
+    const { controller, views } = createHarness();
+    const handle = await controller.createSession('utility-xiaopozhan');
+
+    await controller.navigate(handle, 'https://api.snowovo.cc.cd/login');
+
+    expect(views[0].webContents.debugger.commands).toContainEqual({
+      command: 'Page.navigate',
+      params: { url: 'https://api.snowovo.cc.cd/login' },
+    });
+    expect(views[0].webContents.debugger.commands).toContainEqual({
+      command: 'Emulation.setEmulatedMedia',
+      params: { features: [{ name: 'prefers-color-scheme', value: 'light' }] },
+    });
+    expect(controller.listSessions()[0]).toMatchObject({ url: 'https://api.snowovo.cc.cd/login' });
   });
 
   it('captures a PNG snapshot from the session view', async () => {

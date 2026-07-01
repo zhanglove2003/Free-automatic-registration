@@ -35,6 +35,7 @@ export type BrowserColorScheme = 'light' | 'dark';
 export interface BrowserDebuggerLike {
   isAttached(): boolean;
   attach(protocolVersion?: string): void;
+  detach?(): void;
   sendCommand(command: string, params?: unknown): Promise<unknown>;
 }
 
@@ -100,14 +101,19 @@ export class ElectronBrowserController implements BrowserController {
     this.sessions.set(handle.taskId, view);
     this.sessionSummaries.set(handle.taskId, {
       ...handle,
-      url: initialUrl ?? '',
+      url: '',
       embedded: false,
       createdAt: new Date().toISOString(),
     });
-    await this.applyColorScheme(view);
-
     if (initialUrl) {
-      await view.webContents.loadURL(initialUrl);
+      try {
+        await view.webContents.loadURL(initialUrl);
+        this.updateSession(handle.taskId, { url: initialUrl });
+        await this.applyColorScheme(view);
+      } catch (error) {
+        await this.destroySession(handle);
+        throw error;
+      }
     }
 
     return handle;
@@ -118,8 +124,9 @@ export class ElectronBrowserController implements BrowserController {
     if (!view || view.webContents.isDestroyed()) {
       throw new Error(`Browser session not found: ${handle.taskId}`);
     }
-    await view.webContents.loadURL(url);
+    await this.loadSessionUrl(handle.taskId, view, url);
     this.updateSession(handle.taskId, { url });
+    await this.applyColorScheme(view);
   }
 
   async goBack(handle: BrowserSessionHandle): Promise<void> {
@@ -151,7 +158,9 @@ export class ElectronBrowserController implements BrowserController {
 
   async setColorScheme(scheme: BrowserColorScheme): Promise<void> {
     this.colorScheme = scheme;
-    await Promise.all([...this.sessions.values()].map((view) => this.applyColorScheme(view)));
+    await Promise.all([...this.sessions.entries()]
+      .filter(([taskId]) => Boolean(this.sessionSummaries.get(taskId)?.url))
+      .map(([, view]) => this.applyColorScheme(view)));
   }
 
   async destroySession(handle: BrowserSessionHandle): Promise<void> {
@@ -239,6 +248,22 @@ export class ElectronBrowserController implements BrowserController {
     });
   }
 
+  private async loadSessionUrl(taskId: string, view: BrowserViewLike, url: string): Promise<void> {
+    if (taskId.startsWith('utility-') && view.webContents.debugger) {
+      const browserDebugger = view.webContents.debugger;
+      if (!browserDebugger.isAttached()) {
+        browserDebugger.attach('1.3');
+      }
+      try {
+        await browserDebugger.sendCommand('Page.navigate', { url });
+      } finally {
+        browserDebugger.detach?.();
+      }
+      return;
+    }
+    await view.webContents.loadURL(url);
+  }
+
   private async applyColorScheme(view: BrowserViewLike): Promise<void> {
     if (view.webContents.isDestroyed()) return;
     const browserDebugger = view.webContents.debugger;
@@ -246,9 +271,13 @@ export class ElectronBrowserController implements BrowserController {
     if (!browserDebugger.isAttached()) {
       browserDebugger.attach('1.3');
     }
-    await browserDebugger.sendCommand('Emulation.setEmulatedMedia', {
-      features: [{ name: 'prefers-color-scheme', value: this.colorScheme }],
-    });
+    try {
+      await browserDebugger.sendCommand('Emulation.setEmulatedMedia', {
+        features: [{ name: 'prefers-color-scheme', value: this.colorScheme }],
+      });
+    } finally {
+      browserDebugger.detach?.();
+    }
   }
 }
 
