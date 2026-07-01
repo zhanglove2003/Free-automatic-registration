@@ -211,4 +211,16 @@ describe('custom frameless window chrome', () => {
     expect(network).not.toContain("'direct://'");
   });
 
+  it('registers the app renderer window explicitly for snapshot broadcasts', () => {
+    const main = readProjectFile('src/main/main.ts');
+    const ipc = readProjectFile('src/main/ipc.ts');
+
+    expect(main).toContain("import { registerAppRendererWindow, registerIpc } from './ipc.js';");
+    expect(main).toContain('registerAppRendererWindow(mainWindow);');
+    expect(ipc).toContain('const appRendererWebContentsIds = new Set<number>();');
+    expect(ipc).toContain('export function registerAppRendererWindow(window: BrowserWindow): void');
+    expect(ipc).toContain('appRendererWebContentsIds.has(window.webContents.id)');
+    expect(ipc).not.toContain("getURL().includes('/renderer/index.html')");
+  });
+
 });

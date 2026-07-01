@@ -23,6 +23,7 @@ let launchMode: 'single' | 'multi' = 'single';
 let multiLaunchCount = 2;
 let pendingBrowserCloseTaskId: string | null = null;
 let liveBrowserMonitorTaskId: string | null = null;
+let activePageId: 'dashboard' | 'monitor' | 'xiaopozhan' = 'dashboard';
 let xiaoPoZhanBrowserOpen = false;
 
 async function boot(): Promise<void> {
@@ -210,7 +211,9 @@ async function startLaunch(count: number): Promise<void> {
   if (button) button.disabled = true;
   try {
     await window.registrationApp?.createJob({ count, site: 'chatgpt-openai' });
-    showPageById('monitor');
+    if (activePageId !== 'xiaopozhan') {
+      showPageById('monitor');
+    }
   } finally {
     if (button) button.disabled = false;
   }
@@ -439,6 +442,7 @@ function setActiveSidebarItem(item: HTMLElement): void {
 
 function showPageById(pageId: string): void {
   const normalizedPageId = pageId === 'monitor' ? 'monitor' : pageId === 'xiaopozhan' ? 'xiaopozhan' : 'dashboard';
+  activePageId = normalizedPageId;
   if (normalizedPageId !== 'monitor') {
     void hideLiveBrowserMonitor();
   }
@@ -656,10 +660,10 @@ async function hideXiaoPoZhanBrowser(): Promise<void> {
 }
 
 async function refreshXiaoPoZhanBrowserBounds(): Promise<void> {
-  if (!xiaoPoZhanBrowserOpen || !window.registrationApp?.openUtilityBrowser) return;
+  if (!xiaoPoZhanBrowserOpen || !window.registrationApp?.attachUtilityBrowser) return;
   const stage = document.querySelector<HTMLElement>('.xiaopozhan-browser-stage');
   if (!stage || stage.closest<HTMLElement>('[hidden]')) return;
-  await window.registrationApp.openUtilityBrowser(XIAOPOZHAN_SESSION_ID, XIAOPOZHAN_URL, boundsForElement(stage));
+  await window.registrationApp.attachUtilityBrowser(XIAOPOZHAN_SESSION_ID, boundsForElement(stage));
 }
 
 function boundsForElement(element: HTMLElement): BrowserMonitorBounds {
@@ -733,7 +737,14 @@ function cssEscape(value: string): string {
   if ('CSS' in window && typeof window.CSS.escape === 'function') {
     return window.CSS.escape(value);
   }
-  return value.replace(/["\\]/g, '\\$&');
+  return Array.from(value, (char, index) => {
+    const codePoint = char.codePointAt(0);
+    if (codePoint === undefined) return '';
+    if (/^[a-zA-Z0-9_-]$/.test(char) && !(index === 0 && /^[0-9]$/.test(char))) {
+      return char;
+    }
+    return `\\${codePoint.toString(16)} `;
+  }).join('');
 }
 
 void boot();

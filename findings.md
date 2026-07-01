@@ -37,3 +37,10 @@
 - The app theme toggle only changed the renderer document's `data-theme`; embedded `WebContentsView` pages do not inherit that DOM attribute.
 - Sites that use `prefers-color-scheme` need the embedded Chromium media preference updated explicitly.
 - `Emulation.setEmulatedMedia` over the WebContents debugger lets each embedded browser session report the selected light/dark scheme to the page without site-specific scripts.
+
+## 2026-07-01 PR Review Fixes
+- `BrowserController.createSession` already applies the controller's current color scheme, so Orchestrator should not call `setColorScheme` once per task in a batch.
+- Monitor operations must reject `utility-*` task ids so renderer bugs or forged IPC calls cannot attach/destroy the XiaoPoZhan utility browser through monitor channels.
+- Starting a registration job from the XiaoPoZhan page should not navigate away from that page; otherwise the dedicated browser is detached while the user may be mid-login.
+- `WebContentsView` popup interception cannot await navigation in `setWindowOpenHandler`, so the requested URL is recorded before `loadURL` resolves.
+- Snapshot broadcasting should target explicitly registered app renderer windows rather than relying on a fragile URL substring.

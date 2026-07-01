@@ -30,9 +30,14 @@ class FakeWebContents {
   destroyed = false;
   backAvailable = true;
   forwardAvailable = true;
+  rejectNextLoadUrl?: string;
 
   async loadURL(url: string): Promise<void> {
     this.loadedUrls.push(url);
+    if (this.rejectNextLoadUrl === url) {
+      this.rejectNextLoadUrl = undefined;
+      throw new Error(`navigation failed: ${url}`);
+    }
   }
 
   async capturePage(): Promise<FakeNativeImage> {
@@ -163,6 +168,31 @@ describe('ElectronBrowserController', () => {
       'https://api.snowovo.cc.cd/dashboard',
     ]);
     expect(controller.listSessions()[0]).toMatchObject({ url: 'https://api.snowovo.cc.cd/dashboard' });
+  });
+
+  it('records the requested URL when an embedded new-window navigation fails', async () => {
+    const { controller, views } = createHarness();
+
+    await controller.createSession('utility-xiaopozhan', 'https://api.snowovo.cc.cd/login');
+    views[0].webContents.rejectNextLoadUrl = 'https://api.snowovo.cc.cd/dashboard';
+    const decision = views[0].webContents.windowOpenHandler?.({ url: 'https://api.snowovo.cc.cd/dashboard' });
+    await Promise.resolve();
+
+    expect(decision).toEqual({ action: 'deny' });
+    expect(views[0].webContents.loadedUrls).toEqual([
+      'https://api.snowovo.cc.cd/login',
+      'https://api.snowovo.cc.cd/dashboard',
+    ]);
+    expect(controller.listSessions()[0]).toMatchObject({ url: 'https://api.snowovo.cc.cd/dashboard' });
+  });
+
+  it('exposes direct session handle lookup without sorting all sessions', async () => {
+    const { controller } = createHarness();
+
+    const handle = await controller.createSession('task-123', 'https://chatgpt.com/');
+
+    expect(controller.getSessionHandle('task-123')).toEqual(handle);
+    expect(controller.getSessionHandle('missing-task')).toBeUndefined();
   });
 
   it('uses a stable persistent partition for utility browser sessions', async () => {

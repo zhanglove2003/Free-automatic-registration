@@ -6,6 +6,14 @@ import { checkGptNetwork } from './network/gptNetwork.js';
 import { isBrowserHostWindow, type BrowserMonitorBounds } from './browser/browserController.js';
 
 export const orchestrator = new Orchestrator();
+const appRendererWebContentsIds = new Set<number>();
+
+export function registerAppRendererWindow(window: BrowserWindow): void {
+  appRendererWebContentsIds.add(window.webContents.id);
+  window.on('closed', () => {
+    appRendererWebContentsIds.delete(window.webContents.id);
+  });
+}
 
 export function registerIpc(): void {
   ipcMain.handle('app:snapshot', async () => orchestrator.snapshot());
@@ -50,6 +58,13 @@ export function registerIpc(): void {
   ipcMain.handle('utility:closeBrowser', async (_event, sessionId: string) => {
     await orchestrator.closeUtilityBrowser(sessionId);
     await broadcastSnapshot();
+  });
+  ipcMain.handle('utility:attachBrowser', async (event, sessionId: string, bounds: BrowserMonitorBounds) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!isBrowserHostWindow(window)) {
+      throw new Error('App window not found for utility browser');
+    }
+    await orchestrator.attachUtilityBrowser(sessionId, window, normalizeMonitorBounds(bounds));
   });
   ipcMain.handle('utility:goBack', async (_event, sessionId: string) => {
     await orchestrator.goUtilityBrowserBack(sessionId);
@@ -103,7 +118,7 @@ export async function broadcastSnapshot(): Promise<void> {
 }
 
 function isAppRendererWindow(window: BrowserWindow): boolean {
-  return window.webContents.getURL().includes('/renderer/index.html');
+  return appRendererWebContentsIds.has(window.webContents.id);
 }
 
 function normalizeMonitorBounds(bounds: BrowserMonitorBounds): BrowserMonitorBounds {

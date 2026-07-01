@@ -12,6 +12,7 @@ const api = {
   captureBrowser: (taskId) => ipcRenderer.invoke('monitor:captureBrowser', taskId),
   openUtilityBrowser: (sessionId, url, bounds) => ipcRenderer.invoke('utility:openBrowser', sessionId, url, bounds),
   closeUtilityBrowser: (sessionId) => ipcRenderer.invoke('utility:closeBrowser', sessionId),
+  attachUtilityBrowser: (sessionId, bounds) => ipcRenderer.invoke('utility:attachBrowser', sessionId, bounds),
   goUtilityBrowserBack: (sessionId) => ipcRenderer.invoke('utility:goBack', sessionId),
   goUtilityBrowserForward: (sessionId) => ipcRenderer.invoke('utility:goForward', sessionId),
   reloadUtilityBrowser: (sessionId) => ipcRenderer.invoke('utility:reload', sessionId),

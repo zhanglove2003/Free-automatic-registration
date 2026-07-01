@@ -26,6 +26,7 @@ export interface BrowserController {
   attachSession(taskId: string, host: BrowserHostWindowLike, bounds: BrowserMonitorBounds): Promise<void>;
   detachSession(taskId: string, host?: BrowserHostWindowLike): Promise<void>;
   listSessions(): BrowserSessionSummary[];
+  getSessionHandle(taskId: string): BrowserSessionHandle | undefined;
 }
 
 export type BrowserMonitorBounds = Rectangle;
@@ -203,6 +204,11 @@ export class ElectronBrowserController implements BrowserController {
     return [...this.sessionSummaries.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
+  getSessionHandle(taskId: string): BrowserSessionHandle | undefined {
+    const session = this.sessionSummaries.get(taskId);
+    return session ? { taskId: session.taskId, partition: session.partition } : undefined;
+  }
+
   private updateSession(taskId: string, patch: Partial<Pick<BrowserSessionSummary, 'url' | 'embedded'>>): void {
     const current = this.sessionSummaries.get(taskId);
     if (!current) return;
@@ -223,8 +229,8 @@ export class ElectronBrowserController implements BrowserController {
   private keepNewWindowsInCurrentView(taskId: string, view: BrowserViewLike): void {
     view.webContents.setWindowOpenHandler?.(({ url }) => {
       if (isBrowserNavigableUrl(url)) {
+        this.updateSession(taskId, { url });
         void view.webContents.loadURL(url)
-          .then(() => this.updateSession(taskId, { url }))
           .catch(() => undefined);
       }
       return { action: 'deny' };

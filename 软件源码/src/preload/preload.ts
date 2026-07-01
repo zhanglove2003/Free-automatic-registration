@@ -21,6 +21,7 @@ export interface RegistrationAppApi {
   captureBrowser(taskId: string): Promise<string | undefined>;
   openUtilityBrowser(sessionId: string, url: string, bounds: BrowserMonitorBounds): Promise<void>;
   closeUtilityBrowser(sessionId: string): Promise<void>;
+  attachUtilityBrowser(sessionId: string, bounds: BrowserMonitorBounds): Promise<void>;
   goUtilityBrowserBack(sessionId: string): Promise<void>;
   goUtilityBrowserForward(sessionId: string): Promise<void>;
   reloadUtilityBrowser(sessionId: string): Promise<void>;
@@ -43,6 +44,7 @@ const api: RegistrationAppApi = {
   captureBrowser: (taskId) => ipcRenderer.invoke('monitor:captureBrowser', taskId),
   openUtilityBrowser: (sessionId, url, bounds) => ipcRenderer.invoke('utility:openBrowser', sessionId, url, bounds),
   closeUtilityBrowser: (sessionId) => ipcRenderer.invoke('utility:closeBrowser', sessionId),
+  attachUtilityBrowser: (sessionId, bounds) => ipcRenderer.invoke('utility:attachBrowser', sessionId, bounds),
   goUtilityBrowserBack: (sessionId) => ipcRenderer.invoke('utility:goBack', sessionId),
   goUtilityBrowserForward: (sessionId) => ipcRenderer.invoke('utility:goForward', sessionId),
   reloadUtilityBrowser: (sessionId) => ipcRenderer.invoke('utility:reload', sessionId),

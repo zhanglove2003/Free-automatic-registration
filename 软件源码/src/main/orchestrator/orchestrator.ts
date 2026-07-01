@@ -62,7 +62,6 @@ export class Orchestrator {
       await this.repository.create(task);
       await this.log(task.id, 'info', `Queued ${task.site} registration task`);
       const browser = await this.browser.createSession(task.id, DEFAULT_BROWSER_START_URL);
-      await this.browser.setColorScheme(this.browserColorScheme);
       await this.log(task.id, 'info', `Opened browser session ${browser.partition}`);
       tasks.push(task);
     }
@@ -81,14 +80,17 @@ export class Orchestrator {
   }
 
   async openBrowserMonitor(taskId: string, host: BrowserHostWindowLike, bounds: BrowserMonitorBounds): Promise<void> {
+    assertMonitorBrowserTaskId(taskId);
     await this.browser.attachSession(taskId, host, bounds);
   }
 
   async closeBrowserMonitor(taskId: string): Promise<void> {
+    assertMonitorBrowserTaskId(taskId);
     await this.browser.detachSession(taskId);
   }
 
   async destroyBrowserMonitor(taskId: string): Promise<void> {
+    assertMonitorBrowserTaskId(taskId);
     const handle = this.findBrowserHandle(taskId);
     if (!handle) {
       return;
@@ -97,6 +99,7 @@ export class Orchestrator {
   }
 
   async captureBrowser(taskId: string): Promise<Buffer | undefined> {
+    assertMonitorBrowserTaskId(taskId);
     const handle = this.findBrowserHandle(taskId);
     if (!handle) {
       return undefined;
@@ -108,10 +111,11 @@ export class Orchestrator {
     const taskId = toUtilityBrowserTaskId(sessionId);
     const existing = this.findBrowserHandle(taskId);
     const handle = existing ?? await this.browser.createSession(taskId, url);
-    if (!existing) {
-      await this.browser.setColorScheme(this.browserColorScheme);
-    }
     await this.browser.attachSession(taskId, host, bounds);
+  }
+
+  async attachUtilityBrowser(sessionId: string, host: BrowserHostWindowLike, bounds: BrowserMonitorBounds): Promise<void> {
+    await this.browser.attachSession(toUtilityBrowserTaskId(sessionId), host, bounds);
   }
 
   async setBrowserColorScheme(scheme: BrowserColorScheme): Promise<void> {
@@ -151,7 +155,7 @@ export class Orchestrator {
   }
 
   private findBrowserHandle(taskId: string): BrowserSessionHandle | undefined {
-    return this.browser.listSessions().find((session) => session.taskId === taskId);
+    return this.browser.getSessionHandle(taskId);
   }
 }
 
@@ -165,6 +169,12 @@ function toUtilityBrowserTaskId(sessionId: string): string {
 
 function isUtilityBrowserTaskId(taskId: string): boolean {
   return taskId.startsWith(UTILITY_BROWSER_PREFIX);
+}
+
+function assertMonitorBrowserTaskId(taskId: string): void {
+  if (isUtilityBrowserTaskId(taskId)) {
+    throw new ConfigurationError('monitor browser task id cannot target utility sessions');
+  }
 }
 
 function toStats(tasks: RegistrationTask[]): DashboardStats {

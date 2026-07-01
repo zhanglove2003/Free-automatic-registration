@@ -31,3 +31,6 @@
 - Moved theme toggle handling from the inline HTML script into `app.ts`, then routed light/dark changes through `browser:setColorScheme`.
 - Implemented Chromium media emulation with `Emulation.setEmulatedMedia`, so existing and newly created embedded browser sessions report the app's selected `prefers-color-scheme`.
 - Re-verified with `npm test -- tests/browserController.test.ts tests/monitoring.test.ts`, `npm test`, `npm run typecheck`, and `npm run build`.
+- Addressed PR review feedback with failing tests first: utility sessions are blocked from monitor APIs, batch task creation no longer rebroadcasts color scheme, per-session operations use direct handle lookup, XiaoPoZhan stays active while launching tasks, utility resize reattaches without URL, app renderer windows are registered explicitly, and CSS selector escaping is more complete.
+- Verified the focused tests failed before implementation, then passed after implementation.
+- Re-verified PR review fixes with `npm test -- tests/browserController.test.ts tests/monitoring.test.ts tests/windowChrome.test.ts`, `npm test`, `npm run typecheck`, and `npm run build`.

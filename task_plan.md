@@ -57,6 +57,15 @@ Status: completed
 - Apply the selected color scheme to both existing and newly created browser sessions.
 - Verify focused tests, full test suite, typecheck, and build.
 
+### Phase 9: PR Review Fixes
+Status: completed
+- Remove redundant color-scheme broadcasts during batch task creation.
+- Prevent monitor IPC/orchestrator paths from targeting utility browser sessions.
+- Preserve XiaoPoZhan page state when launching tasks from that page.
+- Add direct browser handle lookup for per-session operations.
+- Rework utility resize handling, renderer broadcast targeting, and CSS selector escaping.
+- Verify focused tests, full test suite, typecheck, and build.
+
 ## Errors Encountered
 | Error | Attempt | Resolution |
 |-------|---------|------------|

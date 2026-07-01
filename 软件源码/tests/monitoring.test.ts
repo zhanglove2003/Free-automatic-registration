@@ -21,6 +21,8 @@ class FakeBrowserController implements BrowserController {
   readonly wentForward: string[] = [];
   readonly reloaded: string[] = [];
   readonly colorSchemes: Array<'light' | 'dark'> = [];
+  readonly handleLookups: string[] = [];
+  listSessionCalls = 0;
 
   async createSession(taskId: string, initialUrl?: string): Promise<BrowserSessionHandle> {
     this.created.push({ taskId, initialUrl });
@@ -66,6 +68,7 @@ class FakeBrowserController implements BrowserController {
   }
 
   listSessions(): BrowserSessionSummary[] {
+    this.listSessionCalls += 1;
     return this.created.filter((session) => !this.destroyed.includes(session.taskId)).map((session) => ({
       taskId: session.taskId,
       partition: `persist:task-${session.taskId}`,
@@ -73,6 +76,12 @@ class FakeBrowserController implements BrowserController {
       embedded: false,
       createdAt: '2026-07-01T00:00:00.000Z',
     }));
+  }
+
+  getSessionHandle(taskId: string): BrowserSessionHandle | undefined {
+    this.handleLookups.push(taskId);
+    const session = this.created.find((created) => created.taskId === taskId && !this.destroyed.includes(taskId));
+    return session ? { taskId: session.taskId, partition: `persist:task-${session.taskId}` } : undefined;
   }
 }
 
@@ -134,6 +143,22 @@ describe('browser monitoring workflow', () => {
     expect(browser.destroyed).toEqual([]);
   });
 
+  it('rejects monitor actions against utility browser sessions', async () => {
+    const browser = new FakeBrowserController();
+    const orchestrator = new Orchestrator(new InMemoryTaskRepository(), browser);
+    const host = { contentView: { addChildView: () => undefined, removeChildView: () => undefined } };
+
+    await orchestrator.openUtilityBrowser('xiaopozhan', 'https://api.snowovo.cc.cd/login', host, { x: 0, y: 0, width: 960, height: 580 });
+
+    await expect(orchestrator.openBrowserMonitor('utility-xiaopozhan', host, { x: 0, y: 0, width: 960, height: 580 })).rejects.toThrow('monitor browser task id cannot target utility sessions');
+    await expect(orchestrator.closeBrowserMonitor('utility-xiaopozhan')).rejects.toThrow('monitor browser task id cannot target utility sessions');
+    await expect(orchestrator.destroyBrowserMonitor('utility-xiaopozhan')).rejects.toThrow('monitor browser task id cannot target utility sessions');
+    await expect(orchestrator.captureBrowser('utility-xiaopozhan')).rejects.toThrow('monitor browser task id cannot target utility sessions');
+
+    expect(browser.destroyed).toEqual([]);
+    expect(browser.attached).toEqual([{ taskId: 'utility-xiaopozhan', bounds: { x: 0, y: 0, width: 960, height: 580 } }]);
+  });
+
   it('routes XiaoPoZhan browser navigation controls through the persistent utility session', async () => {
     const browser = new FakeBrowserController();
     const orchestrator = new Orchestrator(new InMemoryTaskRepository(), browser);
@@ -156,7 +181,30 @@ describe('browser monitoring workflow', () => {
     await orchestrator.setBrowserColorScheme('dark');
     await orchestrator.createJob({ count: 1, site: 'chatgpt-openai' });
 
-    expect(browser.colorSchemes).toEqual(['dark', 'dark']);
+    expect(browser.colorSchemes).toEqual(['dark']);
+  });
+
+  it('does not rebroadcast browser color scheme for every task created in a batch', async () => {
+    const browser = new FakeBrowserController();
+    const orchestrator = new Orchestrator(new InMemoryTaskRepository(), browser);
+
+    await orchestrator.setBrowserColorScheme('dark');
+    await orchestrator.createJob({ count: 3, site: 'chatgpt-openai' });
+
+    expect(browser.colorSchemes).toEqual(['dark']);
+  });
+
+  it('uses direct browser handle lookup for per-session operations', async () => {
+    const browser = new FakeBrowserController();
+    const orchestrator = new Orchestrator(new InMemoryTaskRepository(), browser);
+    const [task] = await orchestrator.createJob({ count: 1, site: 'chatgpt-openai' });
+    browser.listSessionCalls = 0;
+
+    await orchestrator.captureBrowser(task.id);
+    await orchestrator.destroyBrowserMonitor(task.id);
+
+    expect(browser.handleLookups).toContain(task.id);
+    expect(browser.listSessionCalls).toBe(0);
   });
 
   it('exposes monitoring IPC and preload APIs for embedded browser visibility', () => {
@@ -173,6 +221,7 @@ describe('browser monitoring workflow', () => {
     expect(ipc).toContain("ipcMain.handle('utility:goBack'");
     expect(ipc).toContain("ipcMain.handle('utility:goForward'");
     expect(ipc).toContain("ipcMain.handle('utility:reload'");
+    expect(ipc).toContain("ipcMain.handle('utility:attachBrowser'");
     expect(ipc).toContain("ipcMain.handle('browser:setColorScheme'");
     expect(preload).toContain("openBrowserMonitor: (taskId, bounds) => ipcRenderer.invoke('monitor:openBrowser', taskId, bounds)");
     expect(preload).toContain("closeBrowserMonitor: (taskId) => ipcRenderer.invoke('monitor:closeBrowser', taskId)");
@@ -183,6 +232,7 @@ describe('browser monitoring workflow', () => {
     expect(preload).toContain("goUtilityBrowserBack: (sessionId) => ipcRenderer.invoke('utility:goBack', sessionId)");
     expect(preload).toContain("goUtilityBrowserForward: (sessionId) => ipcRenderer.invoke('utility:goForward', sessionId)");
     expect(preload).toContain("reloadUtilityBrowser: (sessionId) => ipcRenderer.invoke('utility:reload', sessionId)");
+    expect(preload).toContain("attachUtilityBrowser: (sessionId, bounds) => ipcRenderer.invoke('utility:attachBrowser', sessionId, bounds)");
     expect(preload).toContain("setBrowserColorScheme: (scheme) => ipcRenderer.invoke('browser:setColorScheme', scheme)");
     expect(preloadTypes).toContain('openBrowserMonitor(taskId: string, bounds: BrowserMonitorBounds): Promise<void>;');
     expect(preloadTypes).toContain('closeBrowserMonitor(taskId: string): Promise<void>;');
@@ -193,6 +243,7 @@ describe('browser monitoring workflow', () => {
     expect(preloadTypes).toContain('goUtilityBrowserBack(sessionId: string): Promise<void>;');
     expect(preloadTypes).toContain('goUtilityBrowserForward(sessionId: string): Promise<void>;');
     expect(preloadTypes).toContain('reloadUtilityBrowser(sessionId: string): Promise<void>;');
+    expect(preloadTypes).toContain('attachUtilityBrowser(sessionId: string, bounds: BrowserMonitorBounds): Promise<void>;');
     expect(preloadTypes).toContain("setBrowserColorScheme(scheme: 'light' | 'dark'): Promise<void>;");
   });
 
@@ -289,5 +340,12 @@ describe('browser monitoring workflow', () => {
     expect(app).toContain('goUtilityBrowserForward');
     expect(app).toContain('reloadUtilityBrowser');
     expect(app).toContain('boundsForElement(stage)');
+    expect(app).toContain("let activePageId: 'dashboard' | 'monitor' | 'xiaopozhan' = 'dashboard'");
+    expect(app).toContain("if (activePageId !== 'xiaopozhan') {");
+    expect(app).toContain("showPageById('monitor');");
+    expect(app).toContain('attachUtilityBrowser');
+    expect(app).toContain('window.registrationApp.attachUtilityBrowser(XIAOPOZHAN_SESSION_ID, boundsForElement(stage))');
+    expect(app).toContain('codePointAt(0)');
+    expect(app).not.toContain('return value.replace(/["\\\\]/g');
   });
 });
