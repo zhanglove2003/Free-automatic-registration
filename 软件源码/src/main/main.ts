@@ -1,7 +1,7 @@
 import { app, BrowserWindow, Menu } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { registerIpc } from './ipc.js';
+import { registerAppRendererWindow, registerIpc } from './ipc.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,6 +30,7 @@ async function createMainWindow(): Promise<void> {
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
   await mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  registerAppRendererWindow(mainWindow);
 }
 
 app.whenReady().then(async () => {

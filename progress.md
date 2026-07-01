@@ -1,0 +1,38 @@
+# 浏览器监控修复进度
+
+## 2026-07-01
+- Started focused repair for browser monitor UX based on three screenshots.
+- Read required skills: using-superpowers, ui-ux-pro-max, planning-with-files, systematic-debugging, test-driven-development.
+- Reviewed screenshots and recorded concrete UI/behavior issues in findings.md.
+- Added failing regression tests for browser monitor destroy flow, monitor layout, preview safety, close confirmation, multi-count input, and launch mode active state.
+- Implemented `monitor:destroyBrowser` from renderer/preload/IPC through `Orchestrator.destroyBrowserMonitor`.
+- Added browser card top-right close button, confirmation modal, safe preview background fallback, in-page monitor stage, manual multi-count input with 2 minimum validation, and stronger active styling for single/multi mode.
+- Verified with `npm test -- tests/monitoring.test.ts`, `npm test`, `npm run typecheck`, and `npm run build`.
+- Follow-up after visual QA screenshots: replaced the native `WebContentsView` monitor stage with a screenshot-based monitor lightbox so browser content no longer overlays or squeezes the app UI; compacted the single/multi toggle into a horizontal "单/多" segmented control.
+- Re-verified with `npm test -- tests/monitoring.test.ts`, `npm test`, `npm run typecheck`, and `npm run build`.
+- Follow-up after user clarification: restored the full "单线程/多线程" launch-mode toggle style, added dashboard page spacing so stats/content/activity cards are not stuck together, and changed monitor viewing back to a live `WebContentsView` mounted inside a lightbox stage instead of relying on hidden-browser screenshots.
+- Updated the hidden preview fallback copy to avoid saying "暂无浏览器画面" when the background browser exists but capture is unavailable.
+- Re-verified with `npm test -- tests/monitoring.test.ts`, `npm test`, `npm run typecheck`, and `npm run build`.
+- Fixed monitor navigation leaking dashboard cards: dashboard spacing CSS now only applies to `.page-panel[data-page="dashboard"]:not([hidden])`, so the `hidden` attribute wins when switching to the monitor page.
+- Re-verified with `npm test -- tests/monitoring.test.ts`, `npm test`, `npm run typecheck`, and `npm run build`.
+- Added the 小破站 sidebar navigation item and a dedicated `data-page="xiaopozhan"` browser surface.
+- Added reusable utility-browser IPC/preload/orchestrator methods backed by the existing `BrowserController`; clicking 小破站 opens `https://api.snowovo.cc.cd/login` in the built-in Chromium view with session id `utility-xiaopozhan`.
+- Added regression coverage for the 小破站 nav/page/API path, verified the new test failed before implementation, then passed after implementation.
+- Re-verified with `npm test -- tests/monitoring.test.ts`, `npm test`, `npm run typecheck`, and `npm run build`.
+- Follow-up for 小破站 dedicated browser behavior: filtered `utility-*` browser sessions out of monitor snapshots so the monitor page only shows task browsers.
+- Changed 小破站 to use a dedicated persistent partition (`persist:utility-xiaopozhan`) and to detach instead of destroy when leaving the page, preserving site data across page switches.
+- Added 小破站 browser back/forward/reload controls via BrowserController, Orchestrator, IPC, preload, and renderer toolbar wiring.
+- Verified the focused tests failed before implementation, then passed after implementation.
+- Re-verified with `npm test -- tests/monitoring.test.ts tests/browserController.test.ts`, `npm test`, `npm run typecheck`, and `npm run build`.
+- Evaluated Chrome-style password saving for 小破站 and left it out of scope for now; current persistent partition preserves normal site data but is not a password manager.
+- Added a failing regression test for embedded new-window links, then implemented `setWindowOpenHandler` in `BrowserController` so http/https popups load inside the same `WebContentsView`.
+- Re-verified with `npm test -- tests/browserController.test.ts`, `npm test`, `npm run typecheck`, and `npm run build`.
+- Added failing regression coverage for embedded-browser color-scheme syncing at the BrowserController, Orchestrator, IPC/preload, and renderer wiring layers.
+- Moved theme toggle handling from the inline HTML script into `app.ts`, then routed light/dark changes through `browser:setColorScheme`.
+- Implemented Chromium media emulation with `Emulation.setEmulatedMedia`, so existing and newly created embedded browser sessions report the app's selected `prefers-color-scheme`.
+- Re-verified with `npm test -- tests/browserController.test.ts tests/monitoring.test.ts`, `npm test`, `npm run typecheck`, and `npm run build`.
+- Addressed PR review feedback with failing tests first: utility sessions are blocked from monitor APIs, batch task creation no longer rebroadcasts color scheme, per-session operations use direct handle lookup, XiaoPoZhan stays active while launching tasks, utility resize reattaches without URL, app renderer windows are registered explicitly, and CSS selector escaping is more complete.
+- Verified the focused tests failed before implementation, then passed after implementation.
+- Re-verified PR review fixes with `npm test -- tests/browserController.test.ts tests/monitoring.test.ts tests/windowChrome.test.ts`, `npm test`, `npm run typecheck`, and `npm run build`.
+- Replaced the popup navigation no-op catch with diagnostic logging, then re-ran `npm test -- tests/browserController.test.ts`, `npm run typecheck`, `npm test`, and `npm run build`.
+- Follow-up review fix: moved popup URL summary updates back into the successful `loadURL().then(...)` path so failed embedded new-window navigations keep the previous actual URL. Verified with `npm test -- tests/browserController.test.ts`, `npm run typecheck`, `npm test`, and `npm run build`.

@@ -404,6 +404,46 @@ body {
 [data-theme="dark"] .nav-launch .nav-label {
   color: rgba(246, 247, 251, 0.92);
 }
+.launch-mode-toggle {
+  width: 60px;
+  display: grid;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 8px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--card-solid) 66%, transparent);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.44);
+}
+.launch-mode-option {
+  min-height: 28px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.05;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.launch-mode-option:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+.launch-mode-option.active {
+  color: #ffffff;
+  background: linear-gradient(180deg, #34C759, #30B450);
+  box-shadow:
+    0 5px 14px rgba(52, 199, 89, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.30);
+}
+[data-theme="dark"] .launch-mode-option.active {
+  color: #ffffff;
+  background: linear-gradient(180deg, #34C759, #259D40);
+  box-shadow:
+    0 5px 14px rgba(52, 199, 89, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.20);
+}
 
 .sidebar-footer {
   margin-top: auto;
@@ -847,6 +887,411 @@ body {
 .activity-text strong { font-weight: 500; color: var(--fg-strong); }
 .activity-reason { color: var(--muted); font-size: 12px; }
 
+/* ===== Browser monitor ===== */
+.page-panel[hidden] { display: none; }
+.page-panel[data-page="dashboard"]:not([hidden]) {
+  display: grid;
+  gap: 18px;
+}
+.monitor-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+.browser-monitor-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.browser-session-card {
+  display: grid;
+  gap: 12px;
+  min-height: 260px;
+  position: relative;
+  padding-top: 22px;
+}
+.browser-session-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--card-solid) 76%, transparent);
+  z-index: 1;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.browser-session-close:hover {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--card-solid));
+  border-color: color-mix(in srgb, var(--danger) 24%, transparent);
+}
+.browser-session-close svg {
+  width: 12px;
+  height: 12px;
+}
+.browser-preview {
+  height: 150px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--fg) 8%, transparent), transparent),
+    color-mix(in srgb, var(--card-solid) 84%, var(--fg) 4%);
+  background-position: center;
+  background-size: cover;
+  display: grid;
+  place-items: center;
+}
+.browser-preview.has-capture {
+  background-color: color-mix(in srgb, var(--fg) 5%, var(--card-solid));
+}
+.browser-preview.has-capture .browser-preview-empty {
+  opacity: 0;
+}
+.browser-preview-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+.browser-session-meta {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.browser-session-title {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--fg-strong);
+}
+.browser-session-detail {
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.browser-session-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.browser-empty-state {
+  min-height: 210px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  text-align: center;
+  font-size: 13px;
+}
+.browser-monitor-lightbox[hidden] { display: none; }
+.browser-monitor-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 48;
+  display: grid;
+  place-items: center;
+  padding: 52px 28px 28px 104px;
+  background: rgba(20, 20, 26, 0.34);
+}
+.browser-monitor-viewer {
+  width: min(1060px, 100%);
+  height: min(720px, calc(100vh - 96px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid var(--border-strong);
+  background: var(--card-solid);
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.24);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .browser-monitor-viewer {
+    background: color-mix(in srgb, var(--card-glass) 94%, transparent);
+    backdrop-filter: blur(26px) saturate(1.36);
+    -webkit-backdrop-filter: blur(26px) saturate(1.36);
+  }
+}
+.browser-monitor-lightbox-toolbar {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.browser-monitor-lightbox-title {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--fg-strong);
+  overflow-wrap: anywhere;
+}
+.browser-monitor-lightbox-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.browser-monitor-stage {
+  flex: 1;
+  min-height: 420px;
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(135deg, rgba(0, 0, 0, 0.08), transparent),
+    color-mix(in srgb, var(--fg) 8%, var(--card-solid));
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 18%, transparent);
+}
+.browser-monitor-stage-placeholder {
+  color: var(--muted);
+  font-size: 13px;
+}
+.xiaopozhan-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 0;
+}
+.xiaopozhan-browser-card {
+  min-height: min(680px, calc(100vh - 148px));
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+.xiaopozhan-browser-shell {
+  flex: 1;
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.xiaopozhan-browser-toolbar {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card-solid) 78%, var(--fg) 4%);
+}
+.xiaopozhan-browser-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.xiaopozhan-nav-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  border: 1px solid transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.xiaopozhan-nav-button:hover {
+  color: var(--fg);
+  background: var(--hover);
+  border-color: var(--border);
+}
+.xiaopozhan-nav-button:disabled {
+  opacity: 0.58;
+  cursor: default;
+}
+.xiaopozhan-nav-button svg {
+  width: 16px;
+  height: 16px;
+}
+.xiaopozhan-browser-stage {
+  flex: 1;
+  min-height: 460px;
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--fg) 6%, transparent), transparent 34%),
+    color-mix(in srgb, var(--card-solid) 84%, var(--fg) 6%);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 18%, transparent);
+}
+.xiaopozhan-browser-placeholder {
+  color: var(--muted);
+  font-size: 13px;
+}
+.xiaopozhan-browser-url {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.multi-launch-modal[hidden] { display: none; }
+.multi-launch-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(20, 20, 26, 0.38);
+}
+.multi-launch-dialog {
+  width: min(340px, 100%);
+  border-radius: 22px;
+  padding: 18px;
+  background: var(--card-solid);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .multi-launch-dialog {
+    background: var(--card-glass);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  }
+}
+.multi-launch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.multi-launch-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fg-strong);
+}
+.modal-icon-button {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.modal-icon-button:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.multi-count-control {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.multi-count-stepper {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--hover);
+  font-size: 22px;
+  line-height: 1;
+}
+.multi-count-display {
+  min-height: 64px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card-solid) 78%, var(--fg) 4%);
+  overflow: hidden;
+}
+.multi-count-input {
+  width: 100%;
+  height: 64px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  text-align: center;
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--fg-strong);
+  line-height: 1;
+}
+.multi-count-input.is-invalid {
+  color: var(--danger);
+}
+.multi-count-input::-webkit-outer-spin-button,
+.multi-count-input::-webkit-inner-spin-button {
+  margin: 0;
+}
+.multi-count-error {
+  min-height: 18px;
+  margin: -8px 0 12px;
+  color: var(--danger);
+  font-size: 12px;
+}
+.multi-launch-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.multi-launch-primary {
+  color: #fff;
+  border-color: color-mix(in srgb, var(--success) 55%, transparent);
+  background: linear-gradient(180deg, #34C759, #30B450);
+}
+.multi-launch-primary:hover {
+  color: #fff;
+  background: linear-gradient(180deg, #3FCE63, #2FA84B);
+}
+.browser-close-confirm-modal[hidden] { display: none; }
+.browser-close-confirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(20, 20, 26, 0.38);
+}
+.browser-close-confirm-dialog {
+  width: min(360px, 100%);
+  border-radius: 18px;
+  padding: 18px;
+  background: var(--card-solid);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
+}
+.browser-close-confirm-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fg-strong);
+  margin-bottom: 8px;
+}
+.browser-close-confirm-note {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+.browser-close-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.browser-close-danger {
+  color: #ffffff;
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  background: linear-gradient(180deg, #FF6B62, #E5484D);
+}
+.browser-close-danger:hover {
+  color: #ffffff;
+  background: linear-gradient(180deg, #FF756D, #D63B42);
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 1100px) {
   .stats-row { grid-template-columns: repeat(2, 1fr); }
@@ -857,6 +1302,22 @@ body {
   .sidebar { width: 64px; }
   .content { padding: 16px; }
   .header-actions .user-avatar { display: none; }
+  .browser-monitor-lightbox {
+    padding: 48px 12px 12px 76px;
+  }
+  .browser-monitor-viewer {
+    height: min(620px, calc(100vh - 72px));
+  }
+  .browser-monitor-stage {
+    min-height: 360px;
+  }
+  .xiaopozhan-browser-card {
+    min-height: min(620px, calc(100vh - 120px));
+  }
+  .xiaopozhan-browser-shell,
+  .xiaopozhan-browser-stage {
+    min-height: 360px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -893,9 +1354,21 @@ body {
           </span>
           <span class="nav-label">启动任务</span>
         </button>
+        <div class="launch-mode-toggle" role="group" aria-label="启动模式">
+          <button class="launch-mode-option active" type="button" data-launch-mode="single" aria-pressed="true" title="单线程">单线程</button>
+          <button class="launch-mode-option" type="button" data-launch-mode="multi" aria-pressed="false" title="多线程">多线程</button>
+        </div>
         <button class="nav-item active" type="button" aria-label="仪表盘" aria-current="page" title="仪表盘" data-nav-id="dashboard" draggable="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 14a9 9 0 0 1 18 0"/><path d="M12 14l3.5-3.5"/><circle cx="12" cy="14" r="1.4" fill="currentColor" stroke="none"/><path d="M3 14h2M19 14h2"/></svg>
           <span class="nav-label">仪表盘</span>
+        </button>
+        <button class="nav-item" type="button" aria-label="监控" title="监控" data-nav-id="monitor" draggable="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8 20h8M12 16v4"/><path d="M7 9h3l1.4 2.5L14 7l2 4h1"/></svg>
+          <span class="nav-label">监控</span>
+        </button>
+        <button class="nav-item" type="button" aria-label="小破站" title="小破站" data-nav-id="xiaopozhan" draggable="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="13" rx="2.5"/><path d="M8 5l-2-3M16 5l2-3"/><path d="M8 11h.01M16 11h.01"/><path d="M10 15h4"/></svg>
+          <span class="nav-label">小破站</span>
         </button>
         <button class="nav-item" type="button" aria-label="设置" title="设置" data-nav-id="settings" draggable="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.5M12 19v2.5M4.5 4.5l1.8 1.8M17.7 17.7l1.8 1.8M2.5 12H5M19 12h2.5M4.5 19.5l1.8-1.8M17.7 6.3l1.8-1.8"/></svg>
@@ -925,23 +1398,24 @@ body {
         </div>
       </div>
 
+      <section class="page-panel" data-page="dashboard">
       <section class="stats-row" data-component="Stats" data-od-id="stats" aria-label="任务统计">
-        <div class="stat-card">
+        <div class="stat-card" data-stat="running">
           <div class="stat-label">运行中</div>
           <div class="stat-value">3</div>
           <div class="stat-delta stat-success">较昨日同时段 +1</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" data-stat="queued">
           <div class="stat-label">排队</div>
           <div class="stat-value">7</div>
           <div class="stat-delta stat-muted">预计 15:00 前清空</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" data-stat="completed">
           <div class="stat-label">已完成</div>
           <div class="stat-value">142</div>
           <div class="stat-delta stat-success">较昨日 +18</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" data-stat="failed">
           <div class="stat-label">失败</div>
           <div class="stat-value">2</div>
           <div class="stat-delta stat-danger">需关注</div>
@@ -1025,24 +1499,100 @@ body {
           </li>
         </ul>
       </section>
+      </section>
+
+      <section class="page-panel monitor-grid" data-page="monitor" hidden>
+        <section class="card" data-component="Browser Monitor" data-od-id="browser-monitor">
+          <div class="card-header">
+            <h2 class="card-title">浏览器监控</h2>
+            <span class="card-meta">实时会话</span>
+          </div>
+          <div class="browser-monitor-list" aria-live="polite">
+            <div class="browser-empty-state">点击启动任务后，这里会显示任务浏览器。</div>
+          </div>
+        </section>
+      </section>
+
+      <section class="page-panel xiaopozhan-grid" data-page="xiaopozhan" hidden>
+        <section class="card xiaopozhan-browser-card" data-component="XiaoPoZhan Browser" data-od-id="xiaopozhan-browser">
+          <div class="card-header">
+            <h2 class="card-title">小破站</h2>
+            <span class="card-meta">内置浏览器</span>
+          </div>
+          <div class="xiaopozhan-browser-shell">
+            <div class="xiaopozhan-browser-toolbar" role="toolbar" aria-label="小破站浏览器导航">
+              <div class="xiaopozhan-browser-controls">
+                <button class="xiaopozhan-nav-button" type="button" aria-label="后退" title="后退" data-xiaopozhan-action="back">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+                </button>
+                <button class="xiaopozhan-nav-button" type="button" aria-label="前进" title="前进" data-xiaopozhan-action="forward">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+                <button class="xiaopozhan-nav-button" type="button" aria-label="刷新" title="刷新" data-xiaopozhan-action="reload">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>
+                </button>
+              </div>
+              <div class="xiaopozhan-browser-url">https://api.snowovo.cc.cd/login</div>
+            </div>
+            <div class="xiaopozhan-browser-stage" aria-label="小破站内置浏览器画面">
+              <span class="xiaopozhan-browser-placeholder">正在打开小破站</span>
+            </div>
+          </div>
+        </section>
+      </section>
     </main>
   </div>
 </div>
 
-<script>
-  // Theme toggle (in-memory only, no storage APIs)
-  (function() {
-    var toggle = document.querySelector('.theme-toggle');
-    if (!toggle) return;
-    var root = document.documentElement;
-    toggle.addEventListener('click', function() {
-      var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-      root.setAttribute('data-theme', next);
-      toggle.setAttribute('aria-label', next === 'light' ? '切换到黑夜模式' : '切换到白天模式');
-    });
-  })();
+<div class="browser-monitor-lightbox" hidden role="dialog" aria-modal="true" aria-label="浏览器监控画面">
+  <div class="browser-monitor-viewer">
+    <div class="browser-monitor-lightbox-toolbar">
+      <div class="browser-monitor-lightbox-title">浏览器监控</div>
+      <div class="browser-monitor-lightbox-actions">
+        <button class="action-btn" type="button" data-browser-monitor-refresh>刷新画面</button>
+        <button class="action-btn" type="button" data-browser-monitor-close>关闭监控</button>
+      </div>
+    </div>
+    <div class="browser-monitor-stage" aria-label="内置浏览器监控画面">
+      <span class="browser-monitor-stage-placeholder">正在打开浏览器画面</span>
+    </div>
+  </div>
+</div>
 
-</script>
+<div class="multi-launch-modal" hidden role="dialog" aria-modal="true" aria-label="选择多开浏览器数量">
+  <div class="multi-launch-dialog">
+    <div class="multi-launch-header">
+      <div class="multi-launch-title">多开浏览器数量</div>
+      <button class="modal-icon-button" type="button" aria-label="关闭弹窗" data-modal-close>
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg>
+      </button>
+    </div>
+    <div class="multi-count-control">
+      <button class="multi-count-stepper" type="button" aria-label="减少数量" data-multi-count="-1">-</button>
+      <div class="multi-count-display" aria-live="polite">
+        <input class="multi-count-input" type="number" min="2" max="8" step="1" value="2" inputmode="numeric" aria-label="多开数量">
+      </div>
+      <button class="multi-count-stepper" type="button" aria-label="增加数量" data-multi-count="1">+</button>
+    </div>
+    <div class="multi-count-error" hidden></div>
+    <div class="multi-launch-actions">
+      <button class="action-btn" type="button" data-modal-close>取消</button>
+      <button class="action-btn multi-launch-primary" type="button" data-multi-confirm>启动</button>
+    </div>
+  </div>
+</div>
+
+<div class="browser-close-confirm-modal" hidden role="dialog" aria-modal="true" aria-label="关闭浏览器监控确认">
+  <div class="browser-close-confirm-dialog">
+    <div class="browser-close-confirm-title">是否关闭该浏览器监控</div>
+    <div class="browser-close-confirm-note">确认后会关闭这个内置浏览器，并从监控列表中移除。</div>
+    <div class="browser-close-confirm-actions">
+      <button class="action-btn" type="button" data-browser-close-cancel>取消</button>
+      <button class="action-btn browser-close-danger" type="button" data-browser-close-confirm>确认关闭</button>
+    </div>
+  </div>
+</div>
+
   <script type="module" src="./app.js"></script>
 </body>
 </html>
