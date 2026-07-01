@@ -9,9 +9,10 @@ export const orchestrator = new Orchestrator();
 const appRendererWebContentsIds = new Set<number>();
 
 export function registerAppRendererWindow(window: BrowserWindow): void {
-  appRendererWebContentsIds.add(window.webContents.id);
+  const webContentsId = window.webContents.id;
+  appRendererWebContentsIds.add(webContentsId);
   window.on('closed', () => {
-    appRendererWebContentsIds.delete(window.webContents.id);
+    appRendererWebContentsIds.delete(webContentsId);
   });
 }
 

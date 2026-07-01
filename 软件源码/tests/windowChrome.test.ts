@@ -219,7 +219,11 @@ describe('custom frameless window chrome', () => {
     expect(main).toContain('registerAppRendererWindow(mainWindow);');
     expect(ipc).toContain('const appRendererWebContentsIds = new Set<number>();');
     expect(ipc).toContain('export function registerAppRendererWindow(window: BrowserWindow): void');
+    expect(ipc).toContain('const webContentsId = window.webContents.id;');
+    expect(ipc).toContain('appRendererWebContentsIds.add(webContentsId);');
+    expect(ipc).toContain('appRendererWebContentsIds.delete(webContentsId);');
     expect(ipc).toContain('appRendererWebContentsIds.has(window.webContents.id)');
+    expect(ipc).not.toContain('appRendererWebContentsIds.delete(window.webContents.id)');
     expect(ipc).not.toContain("getURL().includes('/renderer/index.html')");
   });
 
