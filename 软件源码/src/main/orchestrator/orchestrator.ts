@@ -110,8 +110,19 @@ export class Orchestrator {
   async openUtilityBrowser(sessionId: string, url: string, host: BrowserHostWindowLike, bounds: BrowserMonitorBounds): Promise<void> {
     const taskId = toUtilityBrowserTaskId(sessionId);
     const existing = this.findBrowserHandle(taskId);
-    const handle = existing ?? await this.browser.createSession(taskId, url);
-    await this.browser.attachSession(taskId, host, bounds);
+    if (existing) {
+      await this.browser.attachSession(taskId, host, bounds);
+      return;
+    }
+
+    const handle = await this.browser.createSession(taskId);
+    try {
+      await this.browser.attachSession(taskId, host, bounds);
+      await this.browser.navigate(handle, url);
+    } catch (error) {
+      await this.browser.destroySession(handle);
+      throw error;
+    }
   }
 
   async attachUtilityBrowser(sessionId: string, host: BrowserHostWindowLike, bounds: BrowserMonitorBounds): Promise<void> {

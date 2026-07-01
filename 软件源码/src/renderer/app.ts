@@ -649,8 +649,14 @@ async function showXiaoPoZhanBrowser(): Promise<void> {
   const stage = document.querySelector<HTMLElement>('.xiaopozhan-browser-stage');
   if (!stage || !window.registrationApp?.openUtilityBrowser) return;
   xiaoPoZhanBrowserOpen = true;
+  stage.innerHTML = '<span class="xiaopozhan-browser-placeholder">正在打开小破站</span>';
   await nextAnimationFrame();
-  await window.registrationApp.openUtilityBrowser(XIAOPOZHAN_SESSION_ID, XIAOPOZHAN_URL, boundsForElement(stage));
+  try {
+    await window.registrationApp.openUtilityBrowser(XIAOPOZHAN_SESSION_ID, XIAOPOZHAN_URL, boundsForElement(stage));
+  } catch (error) {
+    xiaoPoZhanBrowserOpen = false;
+    showXiaoPoZhanBrowserError(error);
+  }
 }
 
 async function hideXiaoPoZhanBrowser(): Promise<void> {
@@ -664,6 +670,13 @@ async function refreshXiaoPoZhanBrowserBounds(): Promise<void> {
   const stage = document.querySelector<HTMLElement>('.xiaopozhan-browser-stage');
   if (!stage || stage.closest<HTMLElement>('[hidden]')) return;
   await window.registrationApp.attachUtilityBrowser(XIAOPOZHAN_SESSION_ID, boundsForElement(stage));
+}
+
+function showXiaoPoZhanBrowserError(error: unknown): void {
+  const stage = document.querySelector<HTMLElement>('.xiaopozhan-browser-stage');
+  if (!stage) return;
+  const message = error instanceof Error ? error.message : String(error);
+  stage.innerHTML = `<span class="xiaopozhan-browser-placeholder">打开小破站失败：${escapeHtml(message)}</span>`;
 }
 
 function boundsForElement(element: HTMLElement): BrowserMonitorBounds {

@@ -132,9 +132,9 @@ describe('browser monitoring workflow', () => {
     const snapshot = await orchestrator.snapshot();
     await orchestrator.closeUtilityBrowser('xiaopozhan');
 
-    expect(browser.created).toEqual([{ taskId: 'utility-xiaopozhan', initialUrl: 'https://api.snowovo.cc.cd/login' }]);
+    expect(browser.created).toEqual([{ taskId: 'utility-xiaopozhan', initialUrl: undefined }]);
     expect(snapshot.browserSessions).toEqual([]);
-    expect(browser.navigated).toEqual([]);
+    expect(browser.navigated).toEqual([{ taskId: 'utility-xiaopozhan', url: 'https://api.snowovo.cc.cd/login' }]);
     expect(browser.attached).toEqual([
       { taskId: 'utility-xiaopozhan', bounds },
       { taskId: 'utility-xiaopozhan', bounds },
@@ -333,6 +333,9 @@ describe('browser monitoring workflow', () => {
     expect(app).toContain("pageId === 'xiaopozhan'");
     expect(app).toContain('showXiaoPoZhanBrowser');
     expect(app).toContain('hideXiaoPoZhanBrowser');
+    expect(app).toContain('showXiaoPoZhanBrowserError');
+    expect(app).toContain("xiaoPoZhanBrowserOpen = false;");
+    expect(app).toContain("打开小破站失败");
     expect(app).toContain('openUtilityBrowser');
     expect(app).toContain('closeUtilityBrowser');
     expect(app).toContain('wireXiaoPoZhanBrowserControls');
