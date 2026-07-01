@@ -231,7 +231,9 @@ export class ElectronBrowserController implements BrowserController {
       if (isBrowserNavigableUrl(url)) {
         this.updateSession(taskId, { url });
         void view.webContents.loadURL(url)
-          .catch(() => undefined);
+          .catch((error) => {
+            console.warn(`Embedded browser navigation failed for ${taskId}`, error);
+          });
       }
       return { action: 'deny' };
     });
