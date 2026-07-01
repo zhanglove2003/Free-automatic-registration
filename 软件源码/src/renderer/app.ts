@@ -206,11 +206,11 @@ function renderSnapshot(snapshot: AppSnapshot): void {
 }
 
 function renderStats(snapshot: AppSnapshot): void {
-  const values = document.querySelectorAll<HTMLElement>('.stat-card .stat-value');
-  const stats = [snapshot.stats.running, snapshot.stats.queued, snapshot.stats.completed, snapshot.stats.failed];
-  values.forEach((element, index) => {
-    element.textContent = String(stats[index] ?? 0);
-  });
+  const statKeys: Array<keyof typeof snapshot.stats> = ['running', 'queued', 'completed', 'failed'];
+  for (const key of statKeys) {
+    const valueEl = document.querySelector<HTMLElement>(`.stat-card[data-stat="${key}"] .stat-value`);
+    if (valueEl) valueEl.textContent = String(snapshot.stats[key]);
+  }
 }
 
 function renderTaskTable(tasks: RegistrationTask[]): void {

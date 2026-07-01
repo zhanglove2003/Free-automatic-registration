@@ -32,6 +32,5 @@ export function assertTransition(from: TaskStatus, event: TaskEvent): TaskStatus
   return next;
 }
 
-export function nextTaskState(from: TaskStatus, event: TaskEvent): TaskStatus {
-  return assertTransition(from, event);
-}
+/** @deprecated Use assertTransition directly. */
+export const nextTaskState = assertTransition;

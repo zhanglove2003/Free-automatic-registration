@@ -72,10 +72,12 @@ export class Orchestrator {
 }
 
 function toStats(tasks: RegistrationTask[]): DashboardStats {
-  return {
-    running: tasks.filter((task) => task.status === 'running' || task.status === 'waiting').length,
-    queued: tasks.filter((task) => task.status === 'queued').length,
-    completed: tasks.filter((task) => task.status === 'ready').length,
-    failed: tasks.filter((task) => task.status === 'failed').length,
-  };
+  const stats: DashboardStats = { running: 0, queued: 0, completed: 0, failed: 0 };
+  for (const task of tasks) {
+    if (task.status === 'running' || task.status === 'waiting') stats.running += 1;
+    else if (task.status === 'queued') stats.queued += 1;
+    else if (task.status === 'ready') stats.completed += 1;
+    else if (task.status === 'failed') stats.failed += 1;
+  }
+  return stats;
 }

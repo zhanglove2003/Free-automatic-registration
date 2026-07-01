@@ -926,22 +926,22 @@ body {
       </div>
 
       <section class="stats-row" data-component="Stats" data-od-id="stats" aria-label="任务统计">
-        <div class="stat-card">
+        <div class="stat-card" data-stat="running">
           <div class="stat-label">运行中</div>
           <div class="stat-value">3</div>
           <div class="stat-delta stat-success">较昨日同时段 +1</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" data-stat="queued">
           <div class="stat-label">排队</div>
           <div class="stat-value">7</div>
           <div class="stat-delta stat-muted">预计 15:00 前清空</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" data-stat="completed">
           <div class="stat-label">已完成</div>
           <div class="stat-value">142</div>
           <div class="stat-delta stat-success">较昨日 +18</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" data-stat="failed">
           <div class="stat-label">失败</div>
           <div class="stat-value">2</div>
           <div class="stat-delta stat-danger">需关注</div>
