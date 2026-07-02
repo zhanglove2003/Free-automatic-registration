@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { AppSnapshot, RegistrationTask } from '../main/domain/models.js';
 import type { AppSettings } from '../shared/types.js';
+import type { SmsCountry } from '../shared/smsCountries.js';
+import type { SmsCountryPrice } from '../shared/smsHeroApi.js';
 
 export interface BrowserMonitorBounds {
   x: number;
@@ -13,7 +15,11 @@ export interface RegistrationAppApi {
   snapshot(): Promise<AppSnapshot>;
   getSettings(): Promise<AppSettings>;
   updateSettings(settings: AppSettings): Promise<AppSettings>;
+  getSmsCountries(): Promise<SmsCountry[]>;
+  getCheapestSmsCountries(): Promise<SmsCountryPrice[]>;
+  getSmsBalance(): Promise<{ configured: boolean; balance?: number }>;
   createJob(input: { count: number; site: RegistrationTask['site'] }): Promise<RegistrationTask[]>;
+  testSmsPurchase(): Promise<{ orderId: string; phone: string; country: string; cancelScheduledAt: string }>;
   checkNetwork(): Promise<unknown>;
   openBrowserMonitor(taskId: string, bounds: BrowserMonitorBounds): Promise<void>;
   closeBrowserMonitor(taskId: string): Promise<void>;
@@ -36,7 +42,11 @@ const api: RegistrationAppApi = {
   snapshot: () => ipcRenderer.invoke('app:snapshot'),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (settings) => ipcRenderer.invoke('cmd:saveSettings', settings),
+  getSmsCountries: () => ipcRenderer.invoke('sms:countries'),
+  getCheapestSmsCountries: () => ipcRenderer.invoke('sms:autoCountries'),
+  getSmsBalance: () => ipcRenderer.invoke('sms:balance'),
   createJob: (input) => ipcRenderer.invoke('cmd:start', input),
+  testSmsPurchase: () => ipcRenderer.invoke('sms:testPurchase'),
   checkNetwork: () => ipcRenderer.invoke('network:check'),
   openBrowserMonitor: (taskId, bounds) => ipcRenderer.invoke('monitor:openBrowser', taskId, bounds),
   closeBrowserMonitor: (taskId) => ipcRenderer.invoke('monitor:closeBrowser', taskId),

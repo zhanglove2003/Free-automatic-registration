@@ -1,5 +1,9 @@
 import type { BrowserMonitorBounds, RegistrationAppApi } from '../preload/preload.js';
 import type { AppSnapshot, RegistrationTask } from '../main/domain/models.js';
+import type { AppSettings, NumberSelectionStrategy } from '../shared/types.js';
+import { filterSmsCountries, type SmsCountry } from '../shared/smsCountries.js';
+import { formatSmsTestPurchaseError } from '../shared/smsErrors.js';
+import { formatSmsPriceInput, parseSmsPriceInput } from '../shared/smsPrice.js';
 
 declare global {
   interface Window {
@@ -23,8 +27,10 @@ let launchMode: 'single' | 'multi' = 'single';
 let multiLaunchCount = 2;
 let pendingBrowserCloseTaskId: string | null = null;
 let liveBrowserMonitorTaskId: string | null = null;
-let activePageId: 'dashboard' | 'monitor' | 'xiaopozhan' = 'dashboard';
+let activePageId: 'dashboard' | 'monitor' | 'xiaopozhan' | 'settings' = 'dashboard';
 let xiaoPoZhanBrowserOpen = false;
+let currentSettings: AppSettings | null = null;
+let smsCountries: SmsCountry[] = [];
 
 async function boot(): Promise<void> {
   wireWindowControls();
@@ -37,11 +43,15 @@ async function boot(): Promise<void> {
   wireLiveBrowserMonitor();
   wireBrowserCloseConfirmModal();
   wireXiaoPoZhanBrowserControls();
+  wireSettingsForm();
+  wireCountrySearchFields();
+  void loadSmsCountries();
   window.addEventListener('resize', () => {
     void refreshLiveBrowserBounds();
     void refreshXiaoPoZhanBrowserBounds();
   });
   startAutomaticNetworkCheck();
+  startSmsBalanceCheck();
   const snapshot = await window.registrationApp?.snapshot();
   if (snapshot) {
     renderSnapshot(snapshot);
@@ -441,7 +451,7 @@ function setActiveSidebarItem(item: HTMLElement): void {
 }
 
 function showPageById(pageId: string): void {
-  const normalizedPageId = pageId === 'monitor' ? 'monitor' : pageId === 'xiaopozhan' ? 'xiaopozhan' : 'dashboard';
+  const normalizedPageId = pageId === 'monitor' ? 'monitor' : pageId === 'xiaopozhan' ? 'xiaopozhan' : pageId === 'settings' ? 'settings' : 'dashboard';
   activePageId = normalizedPageId;
   if (normalizedPageId !== 'monitor') {
     void hideLiveBrowserMonitor();
@@ -473,12 +483,14 @@ function showPageById(pageId: string): void {
 function pageTitleFor(pageId: string): string {
   if (pageId === 'monitor') return '监控';
   if (pageId === 'xiaopozhan') return '小破站';
+  if (pageId === 'settings') return '设置';
   return '仪表盘';
 }
 
 function pageSubtitleFor(pageId: string): string {
   if (pageId === 'monitor') return '任务浏览器会话与实时预览';
   if (pageId === 'xiaopozhan') return '内置浏览器 · https://api.snowovo.cc.cd/login';
+  if (pageId === 'settings') return 'SmsHero 接码平台与自动购买号码';
   return '任务/作业调度总览 · 2026-06-29 今日';
 }
 
@@ -529,10 +541,260 @@ function setNetworkStatus(state: 'checking' | 'ok' | 'error', title: string, not
 }
 
 function renderSnapshot(snapshot: AppSnapshot): void {
+  renderSettings(snapshot.settings);
   renderStats(snapshot);
   renderTaskTable(snapshot.tasks);
   renderActivity(snapshot);
   renderBrowserMonitor(snapshot.browserSessions);
+}
+
+function wireSettingsForm(): void {
+  const form = document.querySelector<HTMLFormElement>('[data-settings-form]');
+  if (!form) return;
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    try {
+      await saveSettingsFromForm();
+    } catch (error) {
+      setSettingsStatus('error', error instanceof Error ? error.message : String(error));
+    }
+  });
+
+  form.querySelector<HTMLButtonElement>('[data-sms-test-purchase]')?.addEventListener('click', async () => {
+    setSettingsStatus('saving', '正在保存并测试购买号码');
+    try {
+      await saveSettingsFromForm({ silent: true });
+      const result = await window.registrationApp?.testSmsPurchase();
+      if (!result) return;
+      setSettingsStatus('ok', `购买成功：${result.phone} · 订单 ${result.orderId} · 预计取消 ${formatTime(result.cancelScheduledAt)}`);
+    } catch (error) {
+      setSettingsStatus('error', formatSmsTestPurchaseError(error));
+    }
+  });
+
+  form.querySelector<HTMLButtonElement>('[data-sms-auto-countries]')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    if (!(button instanceof HTMLButtonElement)) return;
+    button.disabled = true;
+    setSettingsStatus('saving', '正在获取最低价候选国家');
+    try {
+      await autoFillCheapestSmsCountries();
+    } catch (error) {
+      setSettingsStatus('error', error instanceof Error ? error.message : String(error));
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+function wireCountrySearchFields(): void {
+  document.querySelectorAll<HTMLInputElement>('[data-country-slot]').forEach((input) => {
+    input.addEventListener('input', () => renderCountryOptions(input));
+    input.addEventListener('focus', () => {
+      hideAllCountryOptions();
+      renderCountryOptions(input);
+    });
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        hideAllCountryOptions();
+      }
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    const target = event.target as Element | null;
+    const option = target?.closest<HTMLButtonElement>('[data-country-option]');
+    if (option) {
+      const field = option.closest<HTMLElement>('.country-search-field');
+      const input = field?.querySelector<HTMLInputElement>('[data-country-slot]');
+      if (input) {
+        input.value = option.dataset.countryValue ?? option.dataset.countryId ?? '';
+        input.focus({ preventScroll: true });
+        hideAllCountryOptions();
+      }
+      return;
+    }
+
+    if (!target?.closest('.country-search-field')) {
+      hideAllCountryOptions();
+    }
+  });
+}
+
+async function loadSmsCountries(): Promise<void> {
+  try {
+    const countries = await window.registrationApp?.getSmsCountries?.();
+    smsCountries = countries ?? [];
+    document.querySelectorAll<HTMLInputElement>('[data-country-slot]').forEach((input) => {
+      if (document.activeElement === input && input.value.trim()) {
+        renderCountryOptions(input);
+      }
+    });
+  } catch (error) {
+    smsCountries = [];
+    setSettingsStatus('error', error instanceof Error ? `国家列表加载失败：${error.message}` : '国家列表加载失败');
+  }
+}
+
+async function autoFillCheapestSmsCountries(): Promise<void> {
+  const saved = await saveSettingsFromForm({ silent: true });
+  if (!saved?.sms.apiKey?.trim()) {
+    throw new Error('请先填写 SmsHero API Key');
+  }
+  const countries = await window.registrationApp?.getCheapestSmsCountries?.();
+  if (!countries || countries.length === 0) {
+    throw new Error('没有获取到可用国家价格，请稍后重试或检查 SmsHero 服务码');
+  }
+
+  const values = countries.slice(0, 3).map((country) => country.zh || country.en || country.id);
+  writeCountrySlotInputs(values);
+  const nextSettings: AppSettings = structuredClone(saved);
+  nextSettings.sms.candidateCountries = values;
+  const updated = await window.registrationApp?.updateSettings(nextSettings);
+  if (updated) renderSettings(updated);
+  const summary = countries
+    .slice(0, 3)
+    .map((country) => `${country.zh || country.en} ${formatSmsPriceInput(country.price)}`)
+    .join(' / ');
+  setSettingsStatus('ok', `已填入最低价国家：${summary}`);
+}
+
+async function saveSettingsFromForm(options: { silent?: boolean } = {}): Promise<AppSettings | undefined> {
+  const settings = currentSettings ?? await window.registrationApp?.getSettings();
+  if (!settings || !window.registrationApp?.updateSettings) return undefined;
+
+  const nextSettings: AppSettings = structuredClone(settings);
+  nextSettings.sms.apiKey = readSettingsInput('smsApiKey').trim();
+  nextSettings.sms.candidateCountries = readCountrySlotInputs();
+  nextSettings.sms.selectionStrategy = readSelectionStrategy();
+  nextSettings.sms.minPrice = readOptionalPriceSettingsInput('smsMinPrice');
+  nextSettings.sms.maxPrice = readOptionalPriceSettingsInput('smsMaxPrice');
+  nextSettings.sms.codeTimeoutMs = Math.max(1, Number(readSettingsInput('smsCodeTimeoutSeconds')) || 20) * 1_000;
+  nextSettings.sms.cancelDelayMs = Math.max(0, Number(readSettingsInput('smsCancelDelayMinutes')) || 3) * 60_000;
+
+  if (!options.silent) setSettingsStatus('saving', '正在保存接码设置');
+  const saved = await window.registrationApp.updateSettings(nextSettings);
+  renderSettings(saved);
+  if (!options.silent) setSettingsStatus('ok', '接码设置已保存');
+  return saved;
+}
+
+async function startSmsBalanceCheck(): Promise<void> {
+  if (!window.registrationApp?.getSmsBalance) return;
+  setSmsBalanceStatus('checking', '自动检测', '正在读取 SmsHero 余额');
+  try {
+    const result = await window.registrationApp.getSmsBalance();
+    if (!result.configured) {
+      setSmsBalanceStatus('idle', '未配置', '填写 SmsHero API Key 后显示余额');
+      return;
+    }
+    setSmsBalanceStatus('ok', `余额 ${formatSmsPriceInput(result.balance)}`, 'SmsHero 接码平台余额正常');
+  } catch (error) {
+    setSmsBalanceStatus('error', '读取失败', error instanceof Error ? error.message : String(error));
+  }
+}
+
+function setSmsBalanceStatus(state: 'idle' | 'checking' | 'ok' | 'error', title: string, note: string): void {
+  const panel = document.querySelector<HTMLElement>('[data-sms-balance-state]');
+  const titleElement = document.querySelector<HTMLElement>('[data-sms-balance-title]');
+  const pillText = document.querySelector<HTMLElement>('[data-sms-balance-pill]');
+  const noteElement = document.querySelector<HTMLElement>('[data-sms-balance-note]');
+  panel?.setAttribute('data-sms-balance-state', state);
+  if (titleElement) titleElement.textContent = title;
+  if (pillText) pillText.textContent = state === 'ok' ? '余额正常' : state === 'error' ? '连接异常' : title;
+  if (noteElement) noteElement.textContent = note;
+}
+
+function renderSettings(settings: AppSettings): void {
+  currentSettings = structuredClone(settings);
+  writeSettingsInput('smsApiKey', settings.sms.apiKey ?? '');
+  writeCountrySlotInputs(settings.sms.candidateCountries);
+  writeSelectionStrategy(settings.sms.selectionStrategy);
+  writeSettingsInput('smsMinPrice', formatSmsPriceInput(settings.sms.minPrice));
+  writeSettingsInput('smsMaxPrice', formatSmsPriceInput(settings.sms.maxPrice));
+  writeSettingsInput('smsCodeTimeoutSeconds', String(Math.round(settings.sms.codeTimeoutMs / 1_000)));
+  writeSettingsInput('smsCancelDelayMinutes', String(Math.round(settings.sms.cancelDelayMs / 60_000)));
+}
+
+function renderCountryOptions(input: HTMLInputElement): void {
+  const listbox = countryListboxFor(input);
+  if (!listbox) return;
+
+  const matches = filterSmsCountries(smsCountries, input.value);
+  listbox.innerHTML = matches.map(renderCountryOption).join('');
+  listbox.hidden = matches.length === 0;
+  input.setAttribute('aria-expanded', String(matches.length > 0));
+}
+
+function hideCountryOptions(input: HTMLInputElement): void {
+  countryListboxFor(input)?.setAttribute('hidden', '');
+  input.setAttribute('aria-expanded', 'false');
+}
+
+function hideAllCountryOptions(): void {
+  document.querySelectorAll<HTMLInputElement>('[data-country-slot]').forEach(hideCountryOptions);
+}
+
+function countryListboxFor(input: HTMLInputElement): HTMLElement | null {
+  return input.closest<HTMLElement>('.country-search-field')?.querySelector<HTMLElement>('[data-country-listbox]') ?? null;
+}
+
+function renderCountryOption(country: SmsCountry): string {
+  return `
+    <button class="country-search-option" type="button" role="option" data-country-option data-country-value="${escapeHtml(country.zh || country.en || country.id)}" data-country-id="${escapeHtml(country.id)}">
+      <span class="country-option-name">
+        <span class="country-option-zh">${escapeHtml(country.zh || country.en)}</span>
+        <span class="country-option-en">${escapeHtml(country.en || country.zh)}</span>
+      </span>
+      <span class="country-option-id">ID ${escapeHtml(country.id)}</span>
+    </button>
+  `;
+}
+
+function readCountrySlotInputs(): string[] {
+  return [0, 1, 2]
+    .map((slot) => readSettingsInput(`smsCountry${slot}`).trim())
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
+function writeCountrySlotInputs(countries: string[]): void {
+  for (let slot = 0; slot < 3; slot += 1) {
+    writeSettingsInput(`smsCountry${slot}`, countries[slot] ?? '');
+  }
+}
+
+function readSelectionStrategy(): NumberSelectionStrategy {
+  const value = document.querySelector<HTMLInputElement>('input[name="smsSelectionStrategy"]:checked')?.value;
+  return value === 'price_first' ? 'price_first' : 'country_first';
+}
+
+function writeSelectionStrategy(strategy: NumberSelectionStrategy): void {
+  const value = strategy === 'price_first' ? 'price_first' : 'country_first';
+  const input = document.querySelector<HTMLInputElement>(`input[name="smsSelectionStrategy"][value="${value}"]`);
+  if (input) input.checked = true;
+}
+
+function readSettingsInput(name: string): string {
+  return document.querySelector<HTMLInputElement>(`[name="${name}"]`)?.value ?? '';
+}
+
+function readOptionalPriceSettingsInput(name: string): number | undefined {
+  return parseSmsPriceInput(readSettingsInput(name));
+}
+
+function writeSettingsInput(name: string, value: string): void {
+  const input = document.querySelector<HTMLInputElement>(`[name="${name}"]`);
+  if (input) input.value = value;
+}
+
+function setSettingsStatus(state: 'idle' | 'saving' | 'ok' | 'error', message: string): void {
+  const status = document.querySelector<HTMLElement>('[data-settings-status]');
+  if (!status) return;
+  status.dataset.state = state;
+  status.textContent = message;
+  status.hidden = message.length === 0;
 }
 
 function renderStats(snapshot: AppSnapshot): void {

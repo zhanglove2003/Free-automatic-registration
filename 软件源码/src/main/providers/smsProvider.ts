@@ -1,5 +1,8 @@
 import type { SmsSettings } from '../../shared/types.js';
-import { ComplianceBoundaryError } from '../domain/errors.js';
+import { fetchHeroSmsCountries, resolveSmsCountryId, type SmsCountry } from '../../shared/smsCountries.js';
+import { parseHeroSmsPrices } from '../../shared/smsHeroApi.js';
+import { formatSmsPriceParam } from '../../shared/smsPrice.js';
+import { ConfigurationError } from '../domain/errors.js';
 
 export interface SmsActivation {
   orderId: string;
@@ -16,20 +19,292 @@ export interface SmsProvider {
   markInvalid(orderId: string): Promise<void>;
 }
 
+type SmsFetch = (url: string | URL, init?: RequestInit) => Promise<Response>;
+
+const HERO_SMS_REQUEST_TIMEOUT_MS = 30_000;
+
 export class HeroSmsProvider implements SmsProvider {
-  async acquireNumber(_opts: AcquireNumberOptions): Promise<SmsActivation> {
-    throw new ComplianceBoundaryError('HeroSMS number acquisition is not implemented in the skeleton; configure and verify official API before enabling network calls');
+  private apiKey = '';
+  private baseUrl = 'https://hero-sms.com/stubs/handler_api.php';
+  private pollingIntervalMs = 5_000;
+
+  constructor(private readonly fetcher: SmsFetch = fetch) {}
+
+  async acquireNumber(opts: AcquireNumberOptions): Promise<SmsActivation> {
+    this.rememberSettings(opts);
+    if (!opts.apiKey?.trim()) {
+      throw new ConfigurationError('sms.apiKey is required for HeroSMS number purchase');
+    }
+
+    const countries = await this.chooseCountriesForPurchase(await chooseCountries(opts, this.fetcher), opts);
+    const noNumberCountries: string[] = [];
+    const transientErrorCountries: string[] = [];
+    for (const country of countries) {
+      let body: string;
+      try {
+        body = await this.requestText({
+          action: 'getNumber',
+          api_key: opts.apiKey,
+          service: opts.serviceCode,
+          country,
+          operator: opts.operator,
+          maxPrice: formatSmsPriceParam(opts.maxPrice),
+        });
+      } catch (error) {
+        if (isTransientHeroSmsRequestError(error)) {
+          transientErrorCountries.push(country);
+          continue;
+        }
+        throw error;
+      }
+      const match = /^ACCESS_NUMBER:([^:]+):(.+)$/.exec(body);
+      if (match) {
+        return {
+          orderId: match[1],
+          phone: match[2],
+          country,
+        };
+      }
+      if (body === 'NO_NUMBERS') {
+        noNumberCountries.push(country);
+        continue;
+      }
+      throw new Error(`HeroSMS getNumber failed: ${body}`);
+    }
+
+    const failures = [
+      noNumberCountries.length > 0 ? `NO_NUMBERS for countries ${noNumberCountries.join(', ')}` : undefined,
+      transientErrorCountries.length > 0 ? `network errors for countries ${transientErrorCountries.join(', ')}` : undefined,
+    ].filter(Boolean).join('; ');
+    throw new Error(`HeroSMS getNumber failed: ${failures || 'no candidate countries were attempted'}`);
   }
 
-  async pollCode(_orderId: string, _timeoutMs: number): Promise<string> {
-    throw new ComplianceBoundaryError('HeroSMS polling is not implemented in the skeleton');
+  async pollCode(orderId: string, timeoutMs: number): Promise<string> {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt <= timeoutMs) {
+      const body = await this.requestText({
+        action: 'getStatus',
+        api_key: this.apiKey,
+        id: orderId,
+      });
+      const match = /^STATUS_OK:(.+)$/.exec(body);
+      if (match) {
+        return match[1];
+      }
+      if (body !== 'STATUS_WAIT_CODE') {
+        throw new Error(`HeroSMS getStatus failed: ${body}`);
+      }
+      const remainingMs = timeoutMs - (Date.now() - startedAt);
+      if (remainingMs <= 0) {
+        break;
+      }
+      await delay(Math.min(this.pollingIntervalMs, remainingMs));
+    }
+
+    throw new Error(`SMS code timeout after ${timeoutMs}ms`);
   }
 
-  async release(_orderId: string): Promise<void> {
-    return;
+  async release(orderId: string): Promise<void> {
+    try {
+      await this.requestText({
+        action: 'setStatus',
+        api_key: this.apiKey,
+        id: orderId,
+        status: '8',
+      });
+    } catch (error) {
+      console.warn(`HeroSMS release failed for order ${orderId}: ${formatUnknownError(error)}`);
+    }
   }
 
   async markInvalid(_orderId: string): Promise<void> {
     return;
   }
+
+  private rememberSettings(opts: SmsSettings): void {
+    this.apiKey = opts.apiKey ?? '';
+    this.baseUrl = opts.baseUrl;
+    this.pollingIntervalMs = opts.pollingIntervalMs;
+  }
+
+  private async requestText(params: Record<string, string | undefined>): Promise<string> {
+    const url = new URL(this.baseUrl);
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value.length > 0) {
+        url.searchParams.set(key, value);
+      }
+    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), HERO_SMS_REQUEST_TIMEOUT_MS);
+    try {
+      const response = await this.fetcher(url, { signal: controller.signal });
+      if (!response.ok) {
+        throw new Error(`HeroSMS request failed with HTTP ${response.status}`);
+      }
+      return (await response.text()).trim();
+    } catch (error) {
+      if (isAbortError(error)) {
+        throw new Error(`HeroSMS request timed out after ${HERO_SMS_REQUEST_TIMEOUT_MS}ms`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  private async chooseCountriesForPurchase(countries: string[], opts: SmsSettings): Promise<string[]> {
+    if (opts.minPrice === undefined && opts.selectionStrategy !== 'price_first') {
+      return countries;
+    }
+
+    const prices = await this.getPrices(opts);
+    const filtered = countries.filter((country) => {
+      const price = prices[country];
+      if (opts.minPrice === undefined) return true;
+      return price === undefined || price >= opts.minPrice!;
+    });
+
+    if (opts.selectionStrategy !== 'price_first') {
+      return filtered;
+    }
+
+    return filtered
+      .map((country, index) => ({ country, index, price: prices[country] ?? Number.POSITIVE_INFINITY }))
+      .sort((left, right) => left.price - right.price || left.index - right.index)
+      .map((item) => item.country);
+  }
+
+  private async getPrices(opts: SmsSettings): Promise<Record<string, number>> {
+    let body: string;
+    try {
+      body = await this.requestText({
+        action: 'getPrices',
+        api_key: opts.apiKey,
+        service: opts.serviceCode,
+      });
+      const parsed = parseHeroSmsPrices(body);
+      const prices: Record<string, number> = {};
+      for (const [country, services] of Object.entries(parsed)) {
+        if (!services || typeof services !== 'object') continue;
+        const service = services[opts.serviceCode];
+        if (!service || typeof service !== 'object') continue;
+        const cost = Number(service.cost);
+        if (Number.isFinite(cost)) {
+          prices[country] = cost;
+        }
+      }
+      return prices;
+    } catch (error) {
+      console.warn(`HeroSMS price lookup failed; falling back to country order: ${formatUnknownError(error)}`);
+      return {};
+    }
+  }
 }
+
+export interface SmsTimeoutPolicy {
+  codeTimeoutMs: number;
+  cancelDelayMs: number;
+}
+
+export async function waitForSmsCodeOrCancelNumber(
+  provider: SmsProvider,
+  activation: SmsActivation,
+  policy: SmsTimeoutPolicy,
+): Promise<string> {
+  try {
+    return await provider.pollCode(activation.orderId, policy.codeTimeoutMs);
+  } catch (error) {
+    if (error instanceof Error && error.message === `SMS code timeout after ${policy.codeTimeoutMs}ms`) {
+      await provider.markInvalid(activation.orderId);
+      setTimeout(() => {
+        void provider.release(activation.orderId);
+      }, policy.cancelDelayMs);
+    }
+    throw error;
+  }
+}
+
+async function chooseCountries(opts: SmsSettings, fetcher: SmsFetch): Promise<string[]> {
+  if (opts.candidateCountries.length === 0) {
+    throw new ConfigurationError('sms.candidateCountries requires at least 1 country');
+  }
+  const direct = opts.candidateCountries.map(toKnownSmsActivateCountryId);
+  if (direct.every(Boolean)) {
+    return direct as string[];
+  }
+
+  let countries: SmsCountry[] = [];
+  try {
+    countries = await fetchHeroSmsCountries(fetcher);
+  } catch {
+    countries = [];
+  }
+
+  return opts.candidateCountries.map((country, index) => {
+    const known = direct[index];
+    if (known) return known;
+    const resolved = resolveSmsCountryId(countries, country);
+    if (!resolved) {
+      throw new ConfigurationError(`Unsupported HeroSMS country code: ${country}. Use a numeric SMS-Activate country id.`);
+    }
+    return resolved;
+  });
+}
+
+function toKnownSmsActivateCountryId(country: string): string | undefined {
+  const normalized = country.trim().toLowerCase().replace(/[\s_-]+/g, '');
+  if (/^\d+$/.test(normalized)) {
+    return normalized;
+  }
+  const mapped = SMS_ACTIVATE_COUNTRY_IDS[normalized];
+  return mapped;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
+function isTransientHeroSmsRequestError(error: unknown): boolean {
+  if (isAbortError(error)) return true;
+  if (!(error instanceof Error)) return false;
+  return error instanceof TypeError ||
+    error.message.includes('fetch failed') ||
+    error.message.includes('network') ||
+    error.message.includes('timed out') ||
+    /^HeroSMS request failed with HTTP (?:408|429|5\d\d)$/.test(error.message);
+}
+
+function formatUnknownError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+const SMS_ACTIVATE_COUNTRY_IDS: Record<string, string> = {
+  us: '12',
+  usa: '12',
+  unitedstates: '12',
+  unitedstatesofamerica: '12',
+  america: '12',
+  美国: '12',
+  美利坚: '12',
+  gb: '16',
+  uk: '16',
+  unitedkingdom: '16',
+  greatbritain: '16',
+  britain: '16',
+  england: '16',
+  英国: '16',
+  ca: '36',
+  canada: '36',
+  加拿大: '36',
+  br: '73',
+  brazil: '73',
+  brasil: '73',
+  巴西: '73',
+  cl: '151',
+  chile: '151',
+  智利: '151',
+};

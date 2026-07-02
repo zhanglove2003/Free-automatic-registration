@@ -343,7 +343,7 @@ describe('browser monitoring workflow', () => {
     expect(app).toContain('goUtilityBrowserForward');
     expect(app).toContain('reloadUtilityBrowser');
     expect(app).toContain('boundsForElement(stage)');
-    expect(app).toContain("let activePageId: 'dashboard' | 'monitor' | 'xiaopozhan' = 'dashboard'");
+    expect(app).toContain("let activePageId: 'dashboard' | 'monitor' | 'xiaopozhan' | 'settings' = 'dashboard'");
     expect(app).toContain("if (activePageId !== 'xiaopozhan') {");
     expect(app).toContain("showPageById('monitor');");
     expect(app).toContain('attachUtilityBrowser');

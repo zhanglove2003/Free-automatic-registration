@@ -38,3 +38,40 @@
 - Follow-up review fix: moved popup URL summary updates back into the successful `loadURL().then(...)` path so failed embedded new-window navigations keep the previous actual URL. Verified with `npm test -- tests/browserController.test.ts`, `npm run typecheck`, `npm test`, and `npm run build`.
 - Fixed the main-process crash on app window close by capturing the renderer `webContents.id` during registration and deleting that stored id from the closed handler, avoiding access to a destroyed `webContents`. Verified red/green with `npm test -- tests/windowChrome.test.ts`, then re-verified with `npm test`, `npm run typecheck`, and `npm run build`.
 - Fixed XiaoPoZhan opening reliability: blank utility sessions no longer apply CDP theme emulation before their first navigation, utility navigation now uses CDP `Page.navigate`, new utility sessions are attached before navigating, failed initial navigations clean up their sessions, and renderer errors are surfaced in the XiaoPoZhan stage so retries are possible. Verified with focused tests, full `npm test`, `npm run typecheck`, `npm run build`, and a real Electron remote-debug run where the XiaoPoZhan WebContents loaded `https://api.snowovo.cc.cd/console` with title `New API`.
+- Started SmsHero接码平台接入. Read planning-with-files and ui-ux-pro-max; the `.agents` ui-ux-pro-max script path was a placeholder, so used the complete `.codex` mirror for design-system guidance.
+- Added TDD coverage for SmsHero settings defaults/validation, SMS-Activate compatible `getNumber`, 20s code timeout, and 3 minute delayed `setStatus status=8` cancellation.
+- Implemented `HeroSmsProvider` with injectable fetch, `getNumber`, `getStatus`, delayed cancel helper, and Orchestrator/IPC/preload `sms:testPurchase`.
+- Added a real Settings page with SmsHero API Key, service code, up to three countries, code-timeout seconds, cancel-delay minutes, save feedback, and "测试购买号码" action.
+- Verified with focused `npm test -- tests/windowChrome.test.ts tests/settings.test.ts tests/smsProvider.test.ts`, full `npm test`, `npm run typecheck`, and `npm run build`.
+- Fixed real HeroSMS API rejection `UNPROCESSABLE_ENTITY:country:INVALID`: candidate countries now normalize `us/usa -> 12`, `gb/uk -> 16`, `ca/canada -> 36`, and numeric country IDs pass through unchanged. Re-verified with focused sms/window tests, full `npm test`, `npm run typecheck`, and `npm run build`.
+- Fixed real HeroSMS `NO_NUMBERS` behavior: `HeroSmsProvider.acquireNumber` now tries the next configured candidate country when a country has no inventory, and only fails after all candidates return no numbers. Added regression coverage and re-verified with `npm test`, `npm run typecheck`, and `npm run build`.
+- Follow-up SmsHero settings polish: hid the service code from the Settings UI while retaining internal default `dr`, added minimum/maximum purchase price controls, accepted Chinese/English/numeric country input, and persisted settings through `electron-store` so API Key survives rebuild/reopen.
+- Reworked test-purchase cancellation into an injectable scheduler so the 20s no-code timeout + 3min cancellation path is test-covered and no longer a completely silent background branch.
+- Verified with focused `npm test -- tests/smsProvider.test.ts tests/settingsPersistence.test.ts tests/windowChrome.test.ts`, full `npm test`, `npm run typecheck`, and `npm run build`.
+- Started Phase 12 for SmsHero country search UI and purchase strategy.
+- Re-read project collaboration docs in `开发提示文档`, plus current renderer/provider/settings tests.
+- Root cause: UI still uses one comma-separated `smsCountries` input and does not expose strategy selection; provider has min-price filtering but not `price_first` sorting.
+- Added failing tests for three country slots, country listbox metadata, price/strategy rows, Brazil/Chile normalization, and lowest-price country ordering.
+- Implemented three searchable country inputs with listbox entries showing Chinese name, English name, and SMS-Activate country ID; removed the old comma-separated country field.
+- Wired settings save/render for three country slots and `sms.selectionStrategy`.
+- Added Brazil (`73`) and Chile (`151`) aliases and made `price_first` sort candidates by `getPrices` cost before `getNumber`.
+- Verified red/green with `npm test -- tests/windowChrome.test.ts tests/smsProvider.test.ts`.
+- Verified final state with `npm test`, `npm run typecheck`, and `npm run build`.
+- Follow-up after user correction: replaced the temporary hard-coded country catalog with the real HeroSMS `getCountries` catalog and added tests for parsing/filtering country records.
+- Confirmed live HeroSMS country data with `action=getCountries`: 196 countries, Brazil ID `73`, Chile ID `151`.
+- Changed country dropdown rendering to rebuild the listbox from filtered matches instead of hiding old static options, so entering `巴西` renders only Brazil.
+- Added an active-input refresh after async country catalog loading to avoid stale dropdown state when the user types before the catalog finishes loading.
+- Re-verified with `npm test -- tests/smsCountries.test.ts tests/windowChrome.test.ts`, `npm test -- tests/smsProvider.test.ts tests/windowChrome.test.ts tests/smsCountries.test.ts`, `npm run typecheck`, full `npm test`, and `npm run build`.
+- Follow-up after screenshot feedback: added red tests for four-decimal SmsHero prices, readable `NO_NUMBERS` feedback, and country dropdown close behavior.
+- Added shared `smsPrice` helpers so Settings display/API params use four decimal places; `0.05` now displays/sends as `0.0500`, and `0.04564` normalizes to `0.0456`.
+- Updated Settings price inputs to `step="0.0001"`.
+- Fixed country option selection so it focuses the selected input with `preventScroll` and then closes all country dropdowns, preventing the second slot from reopening after a selection.
+- Added shared `smsErrors` formatting so Electron-wrapped `sms:testPurchase` `NO_NUMBERS` errors become Chinese guidance instead of raw `Error invoking remote method ...`.
+- Verified with `npm test -- tests/smsPrice.test.ts tests/smsErrors.test.ts tests/smsProvider.test.ts tests/windowChrome.test.ts`, `npm run typecheck`, full `npm test`, and `npm run build`.
+- Started Phase 15 for Settings `自动获取` countries and dashboard `全站监控`.
+- Added red tests for HeroSMS price/balance helpers, Settings auto-country button/IPC/preload wiring, and dashboard all-site monitor structure.
+- Implemented shared `smsHeroApi` helpers for `getPrices`, `getBalance`, parsing balance, and selecting the three cheapest countries with available inventory.
+- Added IPC/preload methods `sms:autoCountries` and `sms:balance`.
+- Wired Settings `自动获取` to save current form values, fetch the cheapest countries, fill the three candidate country inputs, and persist the updated settings.
+- Reworked the dashboard right-side card from `GPT 网络连接` to `全站监控`, keeping GPT network as the first monitor item and adding SmsHero balance as the second item.
+- Verified with `npm test -- tests/smsHeroApi.test.ts tests/windowChrome.test.ts`, `npm run typecheck`, full `npm test`, and `npm run build`.
