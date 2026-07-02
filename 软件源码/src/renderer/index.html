@@ -710,8 +710,25 @@ body {
   50% { opacity: 0.45; }
 }
 
-/* ===== GPT network status — Apple settings style ===== */
+/* ===== All-site monitor — Apple settings style ===== */
 .network-card { display: flex; flex-direction: column; min-height: 222px; }
+.all-site-monitor-stack {
+  display: grid;
+  gap: 12px;
+}
+.monitor-mini-card {
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card-solid) 76%, transparent);
+  padding: 12px;
+}
+.monitor-mini-card .card-header {
+  margin-bottom: 8px;
+}
+.monitor-mini-card .network-overview {
+  min-height: 102px;
+  padding: 12px;
+}
 .apple-network-card {
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.72);
@@ -852,6 +869,24 @@ body {
   color: #FF9F98;
   background: rgba(255, 69, 58, 0.16);
   border-color: rgba(255, 159, 152, 0.22);
+}
+.monitor-mini-card[data-sms-balance-state="ok"] .apple-status-icon {
+  color: #34C759;
+  background: linear-gradient(180deg, rgba(52, 199, 89, 0.16), rgba(52, 199, 89, 0.08));
+}
+.monitor-mini-card[data-sms-balance-state="ok"] .apple-status-pill {
+  color: color-mix(in srgb, #248A3D 86%, var(--fg-strong));
+  background: rgba(52, 199, 89, 0.11);
+  border-color: rgba(52, 199, 89, 0.18);
+}
+.monitor-mini-card[data-sms-balance-state="error"] .apple-status-icon {
+  color: #FF3B30;
+  background: linear-gradient(180deg, rgba(255, 59, 48, 0.15), rgba(255, 59, 48, 0.07));
+}
+.monitor-mini-card[data-sms-balance-state="error"] .apple-status-pill {
+  color: color-mix(in srgb, #D70015 84%, var(--fg-strong));
+  background: rgba(255, 59, 48, 0.10);
+  border-color: rgba(255, 59, 48, 0.18);
 }
 
 /* ===== Activity log ===== */
@@ -1137,6 +1172,213 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.settings-card {
+  max-width: 760px;
+}
+.settings-form {
+  display: grid;
+  gap: 18px;
+}
+.settings-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg-strong);
+  margin-bottom: 2px;
+}
+.settings-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.settings-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+.settings-field-wide {
+  grid-column: 1 / -1;
+}
+.settings-country-row,
+.settings-price-row,
+.settings-strategy-row {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+}
+.settings-country-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.settings-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.settings-mini-button {
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card-solid) 82%, var(--fg) 3%);
+  color: var(--fg-strong);
+  font-size: 12px;
+  font-weight: 650;
+}
+.settings-mini-button:hover {
+  background: var(--hover);
+}
+.settings-mini-button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+.settings-price-row,
+.settings-strategy-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.country-search-field {
+  position: relative;
+}
+.country-search-listbox {
+  position: absolute;
+  z-index: 30;
+  inset-inline: 0;
+  top: calc(100% + 6px);
+  display: grid;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--card-solid);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+}
+.country-search-listbox[hidden] {
+  display: none;
+}
+.country-search-option {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: left;
+}
+.country-search-option[hidden] {
+  display: none;
+}
+.country-search-option:hover,
+.country-search-option:focus-visible {
+  outline: none;
+  background: var(--hover);
+}
+.country-option-name {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+.country-option-zh {
+  color: var(--fg-strong);
+  font-weight: 650;
+}
+.country-option-en {
+  color: var(--muted);
+  font-size: 12px;
+}
+.country-option-id {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.settings-radio-card {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--card-solid) 82%, var(--fg) 3%);
+  cursor: pointer;
+}
+.settings-radio-card input {
+  width: 16px;
+  height: 16px;
+  accent-color: #34C759;
+}
+.settings-radio-card:has(input:checked) {
+  border-color: color-mix(in srgb, #34C759 54%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, #34C759 14%, transparent);
+}
+.settings-label {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--fg-strong);
+}
+.settings-input {
+  min-height: 44px;
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card-solid) 82%, var(--fg) 3%);
+  padding: 10px 12px;
+  outline: none;
+  color: var(--fg);
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.settings-input:focus {
+  border-color: color-mix(in srgb, #0A84FF 58%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, #0A84FF 18%, transparent);
+}
+.settings-help {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.settings-save-button {
+  min-height: 44px;
+  padding-inline: 16px;
+  border-radius: 12px;
+  color: #ffffff;
+  background: linear-gradient(180deg, #34C759, #30B450);
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(52, 199, 89, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+.settings-save-button:hover {
+  filter: brightness(1.04);
+}
+.settings-status {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 10px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
+  font-size: 12px;
+}
+.settings-status[hidden] { display: none; }
+.settings-status[data-state="ok"] {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+.settings-status[data-state="error"] {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
 .multi-launch-modal[hidden] { display: none; }
 .multi-launch-modal {
   position: fixed;
@@ -1302,6 +1544,10 @@ body {
   .sidebar { width: 64px; }
   .content { padding: 16px; }
   .header-actions .user-avatar { display: none; }
+  .settings-fields { grid-template-columns: 1fr; }
+  .settings-country-row,
+  .settings-price-row,
+  .settings-strategy-row { grid-template-columns: 1fr; }
   .browser-monitor-lightbox {
     padding: 48px 12px 12px 76px;
   }
@@ -1443,19 +1689,43 @@ body {
           </table>
         </div>
 
-        <div class="card network-card" data-component="GPT Network Status" data-od-id="gpt-network">
+        <div class="card network-card" data-component="All Site Monitor" data-od-id="all-site-monitor">
           <div class="card-header">
-            <h2 class="card-title">GPT 网络连接</h2>
+            <h2 class="card-title">全站监控</h2>
             <span class="card-meta">自动检测</span>
           </div>
-          <div class="network-overview apple-network-card" data-network-state="checking" aria-live="polite" aria-label="GPT 网络连接状态">
-            <div class="apple-status-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5 12.2a10.5 10.5 0 0 1 14 0"/><path d="M8.5 15.6a5.5 5.5 0 0 1 7 0"/></svg>
+          <div class="all-site-monitor-stack">
+            <div class="monitor-mini-card" data-monitor-card="gpt-network">
+              <div class="card-header">
+                <h3 class="card-title">GPT 网络连接</h3>
+                <span class="card-meta">网络</span>
+              </div>
+              <div class="network-overview apple-network-card" data-network-state="checking" aria-live="polite" aria-label="GPT 网络连接状态">
+                <div class="apple-status-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5 12.2a10.5 10.5 0 0 1 14 0"/><path d="M8.5 15.6a5.5 5.5 0 0 1 7 0"/></svg>
+                </div>
+                <div class="apple-status-detail">
+                  <div class="network-status-title">自动检测中</div>
+                  <div class="apple-status-pill"><span class="apple-status-dot" aria-hidden="true"></span><span class="apple-status-pill-text">自动检测</span></div>
+                  <div class="network-status-note">正在确认当前网络是否可以连接 GPT 服务</div>
+                </div>
+              </div>
             </div>
-            <div class="apple-status-detail">
-              <div class="network-status-title">自动检测中</div>
-              <div class="apple-status-pill"><span class="apple-status-dot" aria-hidden="true"></span><span class="apple-status-pill-text">自动检测</span></div>
-              <div class="network-status-note">正在确认当前网络是否可以连接 GPT 服务</div>
+            <div class="monitor-mini-card" data-monitor-card="sms-balance" data-sms-balance-state="checking" aria-live="polite">
+              <div class="card-header">
+                <h3 class="card-title">接码平台余额</h3>
+                <span class="card-meta">SmsHero</span>
+              </div>
+              <div class="network-overview">
+                <div class="apple-status-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M7 8V6a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v2"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>
+                </div>
+                <div class="apple-status-detail">
+                  <div class="network-status-title" data-sms-balance-title>自动检测中</div>
+                  <div class="apple-status-pill"><span class="apple-status-dot" aria-hidden="true"></span><span data-sms-balance-pill>自动检测</span></div>
+                  <div class="network-status-note" data-sms-balance-note>正在读取 SmsHero 余额</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1538,6 +1808,87 @@ body {
               <span class="xiaopozhan-browser-placeholder">正在打开小破站</span>
             </div>
           </div>
+        </section>
+      </section>
+
+      <section class="page-panel settings-grid" data-page="settings" hidden>
+        <section class="card settings-card" data-component="SmsHero Settings" data-od-id="smshero-settings">
+          <div class="card-header">
+            <h2 class="card-title">SmsHero 接码平台</h2>
+            <span class="card-meta">自动购买号码</span>
+          </div>
+          <form class="settings-form" data-settings-form>
+            <div>
+              <div class="settings-section-title">购买与回收规则</div>
+              <p class="settings-help">购买号码后等待 20 秒验证码；未收到则判为无效，并在 3 分钟后取消购买。</p>
+            </div>
+            <div class="settings-fields">
+              <label class="settings-field settings-field-wide">
+                <span class="settings-label">SmsHero API Key</span>
+                <input class="settings-input" type="password" name="smsApiKey" autocomplete="off" placeholder="粘贴你的 SmsHero API Key">
+              </label>
+              <div class="settings-field settings-field-wide">
+                <div class="settings-label-row">
+                  <span class="settings-label">候选国家</span>
+                  <button class="settings-mini-button" type="button" data-sms-auto-countries>自动获取</button>
+                </div>
+                <div class="settings-country-row" aria-label="候选国家">
+                  <label class="settings-field country-search-field">
+                    <span class="settings-label">候选 1</span>
+                    <input class="settings-input" type="text" name="smsCountry0" data-country-slot="0" autocomplete="off" aria-expanded="false" aria-haspopup="listbox" placeholder="输入巴 / Chile / 73">
+                    <div class="country-search-listbox" role="listbox" data-country-listbox hidden></div>
+                  </label>
+                  <label class="settings-field country-search-field">
+                    <span class="settings-label">候选 2</span>
+                    <input class="settings-input" type="text" name="smsCountry1" data-country-slot="1" autocomplete="off" aria-expanded="false" aria-haspopup="listbox" placeholder="输入中文或英文">
+                    <div class="country-search-listbox" role="listbox" data-country-listbox hidden></div>
+                  </label>
+                  <label class="settings-field country-search-field">
+                    <span class="settings-label">候选 3</span>
+                    <input class="settings-input" type="text" name="smsCountry2" data-country-slot="2" autocomplete="off" aria-expanded="false" aria-haspopup="listbox" placeholder="也可输入国家 ID">
+                    <div class="country-search-listbox" role="listbox" data-country-listbox hidden></div>
+                  </label>
+                </div>
+                <span class="settings-help">每格一个候选国家；可输入中文、英文或 SMS-Activate 数字国家 ID。</span>
+              </div>
+              <div class="settings-field settings-field-wide">
+                <span class="settings-label">选号策略</span>
+                <div class="settings-strategy-row">
+                  <label class="settings-radio-card">
+                    <input type="radio" name="smsSelectionStrategy" value="country_first" checked>
+                    <span>国家顺序优先</span>
+                  </label>
+                  <label class="settings-radio-card">
+                    <input type="radio" name="smsSelectionStrategy" value="price_first">
+                    <span>低价格优先</span>
+                  </label>
+                </div>
+              </div>
+              <div class="settings-price-row">
+                <label class="settings-field">
+                  <span class="settings-label">最低购买价格</span>
+                  <input class="settings-input" type="number" name="smsMinPrice" min="0" step="0.0001" inputmode="decimal" placeholder="不限制">
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">最高购买价格</span>
+                  <input class="settings-input" type="number" name="smsMaxPrice" min="0" step="0.0001" inputmode="decimal" placeholder="不限制">
+                </label>
+              </div>
+              <label class="settings-field">
+                <span class="settings-label">验证码等待秒数</span>
+                <input class="settings-input" type="number" name="smsCodeTimeoutSeconds" min="1" step="1" inputmode="numeric">
+              </label>
+              <label class="settings-field">
+                <span class="settings-label">取消购买延迟分钟</span>
+                <input class="settings-input" type="number" name="smsCancelDelayMinutes" min="0" step="1" inputmode="numeric">
+              </label>
+            </div>
+            <div class="settings-actions">
+              <button class="settings-save-button" type="submit">保存接码设置</button>
+              <button class="action-btn" type="button" data-sms-test-purchase>测试购买号码</button>
+              <span class="settings-status" data-settings-status hidden></span>
+            </div>
+          </form>
         </section>
       </section>
     </main>

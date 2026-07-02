@@ -27,4 +27,21 @@ describe('settings validation', () => {
     expect(result.ok).toBe(false);
     expect(result.errors).toContain('codexManager.directoryExport.path is required when directory export is enabled');
   });
+
+  it('uses the requested SmsHero timeout and delayed-cancel defaults', () => {
+    const settings = defaultSettings();
+
+    expect(settings.sms.codeTimeoutMs).toBe(20_000);
+    expect(settings.sms.cancelDelayMs).toBe(180_000);
+  });
+
+  it('requires SmsHero api key before automatic number purchase is enabled', () => {
+    const settings = defaultSettings();
+    settings.sms.apiKey = '';
+
+    const result = validateSettings(settings);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContain('sms.apiKey is required for HeroSMS number purchase');
+  });
 });

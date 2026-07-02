@@ -211,6 +211,92 @@ describe('custom frameless window chrome', () => {
     expect(network).not.toContain("'direct://'");
   });
 
+  it('provides a settings page for SmsHero API key and purchase timing', () => {
+    const html = readProjectFile('src/renderer/index.html');
+    const app = readProjectFile('src/renderer/app.ts');
+    const ipc = readProjectFile('src/main/ipc.ts');
+    const preloadTs = readProjectFile('src/preload/preload.ts');
+    const preloadCjs = readProjectFile('src/preload/preload.cjs');
+
+    expect(html).toContain('data-page="settings"');
+    expect(html).toContain('data-settings-form');
+    expect(html).toContain('name="smsApiKey"');
+    expect(html).not.toContain('name="smsServiceCode"');
+    expect(html).not.toContain('name="smsCountries"');
+    expect(html).toContain('data-country-slot="0"');
+    expect(html).toContain('data-country-slot="1"');
+    expect(html).toContain('data-country-slot="2"');
+    expect(html).toContain('name="smsCountry0"');
+    expect(html).toContain('name="smsCountry1"');
+    expect(html).toContain('name="smsCountry2"');
+    expect(html).toContain('data-country-listbox');
+    expect(html).toContain('data-sms-auto-countries');
+    expect(html).toContain('自动获取');
+    expect(html).toContain('role="listbox"');
+    expect(html).not.toContain('data-country-id="73"');
+    expect(html).not.toContain('data-country-id="151"');
+    expect(html).toContain('name="smsCodeTimeoutSeconds"');
+    expect(html).toContain('name="smsCancelDelayMinutes"');
+    expect(html).toContain('settings-country-row');
+    expect(html).toContain('settings-price-row');
+    expect(html).toContain('name="smsMinPrice"');
+    expect(html).toContain('name="smsMaxPrice"');
+    expect(html).toMatch(/name="smsMaxPrice"[^>]*step="0\.0001"/);
+    expect(html).toContain('最低购买价格');
+    expect(html).toContain('最高购买价格');
+    expect(html).toContain('name="smsSelectionStrategy"');
+    expect(html).toContain('value="country_first"');
+    expect(html).toContain('value="price_first"');
+    expect(html).toContain('国家顺序优先');
+    expect(html).toContain('低价格优先');
+    expect(html).toContain('保存接码设置');
+    expect(html).toContain('data-sms-test-purchase');
+    expect(html).toContain('测试购买号码');
+    expect(app).toContain('wireSettingsForm();');
+    expect(app).toContain('wireCountrySearchFields();');
+    expect(app).toContain('loadSmsCountries();');
+    expect(app).toContain('autoFillCheapestSmsCountries');
+    expect(app).toContain('getSmsCountries');
+    expect(app).toContain('getCheapestSmsCountries');
+    expect(app).toContain('filterSmsCountries');
+    expect(app).toContain('hideAllCountryOptions();');
+    expect(app).toContain('input.focus({ preventScroll: true });');
+    expect(app).toContain('document.activeElement === input');
+    expect(app).toContain('data-country-id="${escapeHtml(country.id)}"');
+    expect(app).not.toContain('option.hidden = !visible');
+    expect(ipc).toContain("ipcMain.handle('sms:countries'");
+    expect(ipc).toContain("ipcMain.handle('sms:autoCountries'");
+    expect(preloadTs).toContain("getSmsCountries: () => ipcRenderer.invoke('sms:countries')");
+    expect(preloadTs).toContain("getCheapestSmsCountries: () => ipcRenderer.invoke('sms:autoCountries')");
+    expect(preloadCjs).toContain("getSmsCountries: () => ipcRenderer.invoke('sms:countries')");
+    expect(preloadCjs).toContain("getCheapestSmsCountries: () => ipcRenderer.invoke('sms:autoCountries')");
+    expect(app).toContain('renderSettings(snapshot.settings);');
+    expect(app).toContain('updateSettings(nextSettings)');
+    expect(app).toContain('readCountrySlotInputs()');
+    expect(app).toContain('nextSettings.sms.selectionStrategy');
+    expect(app).toContain('testSmsPurchase()');
+    expect(app).not.toContain('smsServiceCode');
+  });
+
+  it('turns the dashboard monitor card into all-site monitoring with GPT and SmsHero balance cards', () => {
+    const html = readProjectFile('src/renderer/index.html');
+    const app = readProjectFile('src/renderer/app.ts');
+    const ipc = readProjectFile('src/main/ipc.ts');
+    const preloadTs = readProjectFile('src/preload/preload.ts');
+
+    expect(html).toContain('全站监控');
+    expect(html).toContain('data-component="All Site Monitor"');
+    expect(html).toContain('data-monitor-card="gpt-network"');
+    expect(html).toContain('GPT 网络连接');
+    expect(html).toContain('data-monitor-card="sms-balance"');
+    expect(html).toContain('接码平台余额');
+    expect(html).toContain('data-sms-balance-state="checking"');
+    expect(app).toContain('startSmsBalanceCheck();');
+    expect(app).toContain('setSmsBalanceStatus');
+    expect(ipc).toContain("ipcMain.handle('sms:balance'");
+    expect(preloadTs).toContain("getSmsBalance: () => ipcRenderer.invoke('sms:balance')");
+  });
+
   it('registers the app renderer window explicitly for snapshot broadcasts', () => {
     const main = readProjectFile('src/main/main.ts');
     const ipc = readProjectFile('src/main/ipc.ts');
