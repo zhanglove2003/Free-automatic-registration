@@ -313,4 +313,13 @@ describe('custom frameless window chrome', () => {
     expect(ipc).not.toContain("getURL().includes('/renderer/index.html')");
   });
 
+  it('does not initialize encrypted settings storage during ipc module import', () => {
+    const ipc = readProjectFile('src/main/ipc.ts');
+
+    expect(ipc).not.toContain('export const orchestrator = new Orchestrator');
+    expect(ipc).toContain('let orchestrator: Orchestrator | undefined;');
+    expect(ipc).toContain('function getOrchestrator(): Orchestrator');
+    expect(ipc).toContain('orchestrator ??= new Orchestrator(undefined, undefined, undefined, new ElectronSettingsStore())');
+  });
+
 });
