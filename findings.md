@@ -44,3 +44,45 @@
 - Starting a registration job from the XiaoPoZhan page should not navigate away from that page; otherwise the dedicated browser is detached while the user may be mid-login.
 - `WebContentsView` popup interception cannot await navigation in `setWindowOpenHandler`, so the requested URL is recorded before `loadURL` resolves.
 - Snapshot broadcasting should target explicitly registered app renderer windows rather than relying on a fragile URL substring.
+
+## 2026-07-01 SmsHero Settings and Purchase
+- Current settings schema already has `sms.apiKey`, `baseUrl`, `serviceCode`, `candidateCountries`, polling, timeout, and max attempts fields, but the renderer has no settings page content.
+- `HeroSmsProvider` is still a skeleton that throws `ComplianceBoundaryError`; it needs a testable SMS-Activate compatible implementation.
+- Project docs specify HeroSMS as SMS-Activate compatible: `getNumber`, `getStatus`, and `setStatus`; status `8` cancels, status `6` completes, and status `3` requests resend.
+- User's first verification target is purchase success through the API, followed by cancellation after 3 minutes. The 20 second no-code condition should mark the number invalid before scheduling the delayed cancel.
+- UI guidance from ui-ux-pro-max: use visible labels, clear inline feedback, touch/click targets at least 44px high, semantic success/error states, and consistent light/dark contrast.
+
+## 2026-07-01 SmsHero Persistence and Cancellation Follow-up
+- User reported settings save does not survive rebuild/reopen; current `Orchestrator` initializes with `defaultSettings()` and IPC `saveSettings` only updates memory, so persistence is missing.
+- Service code is an internal site adapter/provider default and should not be exposed in the Settings page for ordinary users.
+- Candidate country input should support English, Chinese, or numeric IDs. Existing provider only maps a few English aliases.
+- Price controls should include minimum and maximum purchase price. HeroSMS/SMS-Activate compatible `getNumber` supports `maxPrice`; minimum price should be enforced by checking price data where available before attempting purchase.
+- Cancellation currently runs in an unobservable background promise; release failures are swallowed by `.catch(() => undefined)`, which makes "3 minutes did not cancel" hard to diagnose.
+
+## 2026-07-01 SmsHero Country Search UI Follow-up
+- Project docs already require FR-17: three country candidates plus `country_first` / `price_first` strategy.
+- Current renderer still has one `name="smsCountries"` comma-separated text input, so it cannot show per-slot search dropdown entries with Chinese name, English name, and SMS-Activate ID.
+- Current renderer does not write `sms.selectionStrategy` from the settings form even though the shared settings schema already supports it.
+- Current provider filters countries below `minPrice`, but `price_first` does not yet reorder countries by current `getPrices` cost.
+- UI guidance: keep form labels visible, use listbox/option semantics for country search, and keep related numeric controls in stable row containers.
+
+## 2026-07-01 SmsHero Dynamic Country Catalog Follow-up
+- The real HeroSMS country catalog is available without an API key at `https://hero-sms.com/stubs/handler_api.php?action=getCountries`.
+- A live check returned 196 countries; Brazil is `{ id: 73, eng: "Brazil", chn: "巴西" }` and Chile is `{ id: 151, eng: "Chile", chn: "智利" }`.
+- The prior `COUNTRY_CATALOG` approach was only a temporary hard-coded subset and cannot satisfy Chinese/English/ID search across the platform country list.
+- Using `option.hidden = !visible` is fragile here because `.country-search-option { display: grid; }` can override the browser's hidden default. Re-rendering the listbox with only filtered matches is the safer behavior.
+- The renderer should refresh the focused country input once the async HeroSMS country list arrives, so fast typing immediately after opening Settings does not leave an empty or stale dropdown.
+
+## 2026-07-01 SmsHero Settings Precision and Error Feedback
+- Price input step was still `0.01`, which made the Settings UI behave like two-decimal money input. HeroSMS prices need four-decimal support such as `0.0456`.
+- Rendering saved numeric prices with `String(value)` turns `0.0500` into `0.05`; use a dedicated four-decimal display formatter instead.
+- Country option selection hid the current listbox before calling `input.focus()`. When the option button had focus, focusing the input could trigger the input focus handler and reopen the dropdown. Close all dropdowns after focusing the selected input.
+- Electron wraps thrown IPC errors as `Error invoking remote method ...`; showing that raw message makes expected HeroSMS inventory failures look like application crashes.
+- `NO_NUMBERS` means the selected countries have no available inventory under the current constraints. The UI should tell the user to change countries, raise max price, or retry later instead of showing raw country IDs.
+
+## 2026-07-02 SmsHero Auto Countries and All-Site Monitor
+- The Settings page already has dynamic HeroSMS country catalog support, so the `自动获取` action can reuse `getCountries` plus `getPrices` instead of adding another static country table.
+- `getPrices` data includes service-level `cost` and `count`; auto-fill should ignore countries with `count <= 0` and sort by ascending cost.
+- Auto-filled countries should be written through the existing settings update path so they survive rebuild/reopen.
+- The existing dashboard GPT network card is a good visual container for broader service health. Renaming it to `全站监控` and nesting two monitor items keeps the right rail compact.
+- SmsHero balance uses the SMS-Activate compatible `getBalance` action and should show `未配置` when no API key is saved instead of surfacing a request error.

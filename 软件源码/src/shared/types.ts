@@ -11,7 +11,11 @@ export interface SmsSettings {
   candidateCountries: string[];
   selectionStrategy: NumberSelectionStrategy;
   operator?: string;
+  minPrice?: number;
+  maxPrice?: number;
   pollingIntervalMs: number;
+  codeTimeoutMs: number;
+  cancelDelayMs: number;
   timeoutMs: number;
   maxPollAttempts: number;
 }

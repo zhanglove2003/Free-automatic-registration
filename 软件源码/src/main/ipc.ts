@@ -4,8 +4,11 @@ import { Orchestrator } from './orchestrator/orchestrator.js';
 import type { CreateJobInput } from './orchestrator/orchestrator.js';
 import { checkGptNetwork } from './network/gptNetwork.js';
 import { isBrowserHostWindow, type BrowserMonitorBounds } from './browser/browserController.js';
+import { ElectronSettingsStore } from './storage/settingsStore.js';
+import { fetchHeroSmsCountries } from '../shared/smsCountries.js';
+import { fetchCheapestHeroSmsCountries, fetchHeroSmsBalance } from '../shared/smsHeroApi.js';
 
-export const orchestrator = new Orchestrator();
+export const orchestrator = new Orchestrator(undefined, undefined, undefined, new ElectronSettingsStore());
 const appRendererWebContentsIds = new Set<number>();
 
 export function registerAppRendererWindow(window: BrowserWindow): void {
@@ -26,6 +29,16 @@ export function registerIpc(): void {
   ipcMain.handle('cmd:start', async (_event, input: CreateJobInput) => startJob(input));
   ipcMain.handle('job:create', async (_event, input: CreateJobInput) => {
     return startJob(input);
+  });
+  ipcMain.handle('sms:testPurchase', async () => orchestrator.testSmsPurchase());
+  ipcMain.handle('sms:countries', async () => fetchHeroSmsCountries());
+  ipcMain.handle('sms:autoCountries', async () => fetchCheapestHeroSmsCountries(orchestrator.getSettings().sms));
+  ipcMain.handle('sms:balance', async () => {
+    const settings = orchestrator.getSettings();
+    if (!settings.sms.apiKey?.trim()) {
+      return { configured: false };
+    }
+    return { configured: true, balance: await fetchHeroSmsBalance(settings.sms) };
   });
   ipcMain.handle('network:check', async () => checkGptNetwork());
   ipcMain.handle('monitor:openBrowser', async (event, taskId: string, bounds: BrowserMonitorBounds) => {

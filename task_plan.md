@@ -66,7 +66,59 @@ Status: completed
 - Rework utility resize handling, renderer broadcast targeting, and CSS selector escaping.
 - Verify focused tests, full test suite, typecheck, and build.
 
+### Phase 10: SmsHero Settings and Number Purchase
+Status: completed
+- Add a settings page for HeroSMS/SmsHero API Key and core purchase timing fields.
+- Implement SMS-Activate compatible HeroSMS number purchase, 20s code wait timeout, invalid marking, and delayed cancellation support.
+- Verify first success criterion with tests: purchase number through API shape, then cancel the order after the configured 3 minute delay.
+- Run focused tests, full test suite, typecheck, and build.
+
+### Phase 11: SmsHero Settings Persistence and Purchase Controls
+Status: completed
+- Persist SmsHero settings across app rebuild/restart without logging secrets.
+- Hide service code from the Settings UI while retaining the default ChatGPT/OpenAI service code internally.
+- Accept candidate countries as English names/codes, Chinese names, or SMS-Activate numeric country IDs.
+- Add minimum and maximum purchase price controls; send maximum price to HeroSMS and skip countries below the configured minimum when price data is available.
+- Make the 20s no-code timeout and 3 minute cancellation path observable and test-covered.
+- Run focused tests, full test suite, typecheck, and build.
+
+### Phase 12: SmsHero Country Search UI and Purchase Strategy
+Status: completed
+- Replace the single comma-separated country field with three candidate-country search slots in one row.
+- Add autocomplete/listbox options that show Chinese name, English name, and SMS-Activate country ID.
+- Keep min/max price controls in one row and add a country-order vs lowest-price strategy selector.
+- Persist the three slots and strategy through existing settings save/load.
+- Make `price_first` sort candidate countries by real price before purchase while keeping `country_first` order.
+- Verify with failing tests first, then focused tests, full suite, typecheck, and build.
+
+### Phase 13: SmsHero Dynamic Country Catalog and Exact Filtering
+Status: completed
+- Replace the temporary hard-coded country catalog with HeroSMS `getCountries`.
+- Parse country records into searchable Chinese, English, numeric ID, and alias tokens.
+- Re-render the country listbox from filtered results so entering `巴西` leaves only Brazil.
+- Refresh the active country input after the async country catalog finishes loading.
+- Verify with focused country/UI/provider tests, live `getCountries` evidence, full suite, typecheck, and build.
+
+### Phase 14: SmsHero Settings Precision and Error Feedback
+Status: completed
+- Save and display SMS purchase price fields with four-decimal precision.
+- Send `maxPrice` to HeroSMS with four decimal places, for example `0.0500`.
+- Close all country dropdown listboxes after choosing an option so focus does not reopen the selected slot.
+- Convert Electron-wrapped HeroSMS `NO_NUMBERS` errors into actionable Chinese feedback.
+- Verify with focused red/green tests, full suite, typecheck, and build.
+
+### Phase 15: SmsHero Auto Countries and All-Site Monitor
+Status: completed
+- Add an `自动获取` button next to Settings candidate countries.
+- Fetch HeroSMS country catalog and current prices, then fill the three cheapest countries with available inventory.
+- Persist the auto-filled candidate countries through the existing settings save path.
+- Rename the dashboard GPT network card to `全站监控`.
+- Keep GPT network connection as the first monitor item and add SmsHero balance as the second monitor item.
+- Verify with focused red/green tests, full suite, typecheck, and build.
+
 ## Errors Encountered
 | Error | Attempt | Resolution |
 |-------|---------|------------|
 | Old collaboration-doc memory path did not exist: `项目分析和合作提示` | 1 | Re-checked the current `开发提示文档` project docs before editing. |
+| `C:\Users\Snow\.agents\skills\ui-ux-pro-max\scripts\search.py` missing because that install has placeholder files | 1 | Used the complete mirror at `C:\Users\Snow\.codex\skills\ui-ux-pro-max\scripts\search.py` for UI guidance. |
+| `rg` regex check failed due PowerShell quote escaping around `data-country-id=\"73\"` | 1 | Re-ran as separate `rg --fixed-strings` checks for old and new UI markers. |

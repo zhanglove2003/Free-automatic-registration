@@ -3,6 +3,7 @@ import { defaultSettings, validateSettings } from '../domain/settings.js';
 import type { AppSnapshot, DashboardStats, RegistrationTask, TaskLogEntry } from '../domain/models.js';
 import { InMemoryTaskRepository, type TaskRepository } from '../storage/taskRepository.js';
 import { ConfigurationError } from '../domain/errors.js';
+import { HeroSmsProvider, waitForSmsCodeOrCancelNumber, type SmsActivation, type SmsProvider, type SmsTimeoutPolicy } from '../providers/smsProvider.js';
 import {
   ElectronBrowserController,
   type BrowserController,
@@ -20,6 +21,34 @@ export interface CreateJobInput {
   site: RegistrationTask['site'];
 }
 
+export interface SettingsStore {
+  load(): AppSettings | undefined;
+  save(settings: AppSettings): void;
+}
+
+export interface SmsCancellationScheduler {
+  schedule(provider: SmsProvider, activation: SmsActivation, policy: SmsTimeoutPolicy): void;
+}
+
+class NoopSettingsStore implements SettingsStore {
+  load(): AppSettings | undefined {
+    return undefined;
+  }
+
+  save(_settings: AppSettings): void {
+    return;
+  }
+}
+
+class DefaultSmsCancellationScheduler implements SmsCancellationScheduler {
+  schedule(provider: SmsProvider, activation: SmsActivation, policy: SmsTimeoutPolicy): void {
+    void waitForSmsCodeOrCancelNumber(provider, activation, policy).catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`SmsHero cancellation workflow ended: ${message}`);
+    });
+  }
+}
+
 export class Orchestrator {
   private settings: AppSettings;
   private browserColorScheme: BrowserColorScheme = 'light';
@@ -27,8 +56,11 @@ export class Orchestrator {
   constructor(
     private readonly repository: TaskRepository = new InMemoryTaskRepository(),
     private readonly browser: BrowserController = new ElectronBrowserController(),
+    private readonly smsProvider: SmsProvider = new HeroSmsProvider(),
+    private readonly settingsStore: SettingsStore = new NoopSettingsStore(),
+    private readonly smsCancellationScheduler: SmsCancellationScheduler = new DefaultSmsCancellationScheduler(),
   ) {
-    this.settings = defaultSettings();
+    this.settings = mergeSettings(defaultSettings(), this.settingsStore.load());
   }
 
   getSettings(): AppSettings {
@@ -41,6 +73,7 @@ export class Orchestrator {
       throw new ConfigurationError(validation.errors.join('; '));
     }
     this.settings = structuredClone(settings);
+    this.settingsStore.save(this.settings);
   }
 
   async createJob(input: CreateJobInput): Promise<RegistrationTask[]> {
@@ -66,6 +99,27 @@ export class Orchestrator {
       tasks.push(task);
     }
     return tasks;
+  }
+
+  async testSmsPurchase(): Promise<{ orderId: string; phone: string; country: string; cancelScheduledAt: string }> {
+    const validation = validateSettings(this.settings);
+    if (!validation.ok) {
+      throw new ConfigurationError(validation.errors.join('; '));
+    }
+    if (!this.settings.sms.apiKey?.trim()) {
+      throw new ConfigurationError('sms.apiKey is required for HeroSMS number purchase');
+    }
+
+    const activation = await this.smsProvider.acquireNumber(this.settings.sms);
+    const policy = {
+      codeTimeoutMs: this.settings.sms.codeTimeoutMs,
+      cancelDelayMs: this.settings.sms.cancelDelayMs,
+    };
+    this.smsCancellationScheduler.schedule(this.smsProvider, activation, policy);
+    return {
+      ...activation,
+      cancelScheduledAt: new Date(Date.now() + this.settings.sms.codeTimeoutMs + this.settings.sms.cancelDelayMs).toISOString(),
+    };
   }
 
   async snapshot(): Promise<AppSnapshot> {
@@ -168,6 +222,22 @@ export class Orchestrator {
   private findBrowserHandle(taskId: string): BrowserSessionHandle | undefined {
     return this.browser.getSessionHandle(taskId);
   }
+}
+
+function mergeSettings(defaults: AppSettings, saved: AppSettings | undefined): AppSettings {
+  if (!saved) return defaults;
+  return {
+    ...defaults,
+    ...saved,
+    sms: { ...defaults.sms, ...saved.sms },
+    captcha: { ...defaults.captcha, ...saved.captcha },
+    email: { ...defaults.email, ...saved.email },
+    codexManager: {
+      directoryExport: { ...defaults.codexManager.directoryExport, ...saved.codexManager?.directoryExport },
+      rpcImport: { ...defaults.codexManager.rpcImport, ...saved.codexManager?.rpcImport },
+    },
+    runtime: { ...defaults.runtime, ...saved.runtime },
+  };
 }
 
 function toUtilityBrowserTaskId(sessionId: string): string {
