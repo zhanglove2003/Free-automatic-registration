@@ -1,14 +1,13 @@
 name: CI
 
-# 持续集成：对每个 PR 与 main 推送执行 lint / 类型检查 / 测试 / 构建。
+# 持续集成：对每次 push 与 main/develop PR 执行 lint / 类型检查 / 测试 / 构建。
 # 目标平台为 Windows 桌面应用（Electron），因此构建在 windows-latest 上运行。
 # 源码（软件源码/package.json）尚未初始化时，相关步骤会自动跳过，保证仓库从第一天起就是绿的。
 
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 # 同一分支/PR 的并发运行只保留最新一次，节省额度。
 concurrency:
@@ -55,7 +54,7 @@ jobs:
       - name: 安装 Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: 软件源码/package-lock.json
 
