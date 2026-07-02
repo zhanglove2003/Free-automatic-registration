@@ -61,6 +61,14 @@ export function validateSettings(settings: AppSettings): ValidationResult {
     errors.push('sms.apiKey is required for HeroSMS number purchase');
   }
 
+  if (settings.sms.apiKey && !/^[a-zA-Z0-9]{16,128}$/.test(settings.sms.apiKey)) {
+    errors.push('sms.apiKey must be 16-128 alphanumeric characters');
+  }
+
+  if (settings.sms.candidateCountries.some((country) => country.length > 100)) {
+    errors.push('sms.candidateCountries entries must be 100 characters or less');
+  }
+
   if (settings.sms.codeTimeoutMs < 1_000) {
     errors.push('sms.codeTimeoutMs must be at least 1000ms');
   }

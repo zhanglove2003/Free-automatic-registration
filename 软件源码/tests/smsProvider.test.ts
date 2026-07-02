@@ -67,6 +67,42 @@ describe('HeroSmsProvider', () => {
     expect(calls[1]).toContain('country=16');
   });
 
+  it('tries the next candidate country when a transient network error happens', async () => {
+    const calls: string[] = [];
+    const fetcher = vi.fn(async (url: string | URL) => {
+      calls.push(String(url));
+      if (String(url).includes('country=12')) {
+        throw new TypeError('fetch failed');
+      }
+      return makeTextResponse('ACCESS_NUMBER:67890:447700900123');
+    });
+    const settings = defaultSettings();
+    settings.sms.apiKey = 'sms-key';
+    settings.sms.candidateCountries = ['us', 'gb'];
+
+    const provider = new HeroSmsProvider(fetcher);
+    const activation = await provider.acquireNumber(settings.sms);
+
+    expect(activation).toEqual({ orderId: '67890', phone: '447700900123', country: '16' });
+    expect(calls).toHaveLength(2);
+  });
+
+  it('adds an abort signal to HeroSMS network requests', async () => {
+    let signal: AbortSignal | undefined;
+    const fetcher = vi.fn(async (_url: string | URL, init?: RequestInit) => {
+      signal = init?.signal ?? undefined;
+      return makeTextResponse('ACCESS_NUMBER:12345:15551234567');
+    });
+    const settings = defaultSettings();
+    settings.sms.apiKey = 'sms-key';
+    settings.sms.candidateCountries = ['us'];
+
+    const provider = new HeroSmsProvider(fetcher);
+    await provider.acquireNumber(settings.sms);
+
+    expect(signal).toBeInstanceOf(AbortSignal);
+  });
+
   it('normalizes Chinese and English country names to SMS-Activate ids', async () => {
     const calls: string[] = [];
     const fetcher = vi.fn(async (url: string | URL) => {
@@ -174,6 +210,39 @@ describe('HeroSmsProvider', () => {
     expect(activation.country).toBe('12');
     const getNumberCalls = calls.filter((url) => url.includes('action=getNumber'));
     expect(getNumberCalls[0]).toContain('country=12');
+  });
+
+  it('falls back to country order when price lookup fails', async () => {
+    const calls: string[] = [];
+    const fetcher = vi.fn(async (url: string | URL) => {
+      calls.push(String(url));
+      const value = String(url);
+      if (value.includes('action=getPrices')) {
+        throw new TypeError('fetch failed');
+      }
+      return makeTextResponse('ACCESS_NUMBER:12345:15551234567');
+    });
+    const settings = defaultSettings();
+    settings.sms.apiKey = 'sms-key';
+    settings.sms.candidateCountries = ['gb', 'us'];
+    settings.sms.selectionStrategy = 'price_first';
+
+    const provider = new HeroSmsProvider(fetcher);
+    const activation = await provider.acquireNumber(settings.sms);
+
+    expect(activation.country).toBe('16');
+    expect(calls.some((url) => url.includes('action=getPrices'))).toBe(true);
+    const getNumberCalls = calls.filter((url) => url.includes('action=getNumber'));
+    expect(getNumberCalls[0]).toContain('country=16');
+  });
+
+  it('does not reject release when HeroSMS cancellation fails', async () => {
+    const fetcher = vi.fn(async () => {
+      throw new TypeError('fetch failed');
+    });
+    const provider = new HeroSmsProvider(fetcher);
+
+    await expect(provider.release('12345')).resolves.toBeUndefined();
   });
 
   it('marks a number invalid after a 20s code timeout and cancels it 3 minutes later', async () => {

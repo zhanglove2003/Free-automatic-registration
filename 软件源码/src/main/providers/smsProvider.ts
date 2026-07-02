@@ -19,7 +19,9 @@ export interface SmsProvider {
   markInvalid(orderId: string): Promise<void>;
 }
 
-type SmsFetch = (url: string | URL) => Promise<Response>;
+type SmsFetch = (url: string | URL, init?: RequestInit) => Promise<Response>;
+
+const HERO_SMS_REQUEST_TIMEOUT_MS = 30_000;
 
 export class HeroSmsProvider implements SmsProvider {
   private apiKey = '';
@@ -36,15 +38,25 @@ export class HeroSmsProvider implements SmsProvider {
 
     const countries = await this.chooseCountriesForPurchase(await chooseCountries(opts, this.fetcher), opts);
     const noNumberCountries: string[] = [];
+    const transientErrorCountries: string[] = [];
     for (const country of countries) {
-      const body = await this.requestText({
-        action: 'getNumber',
-        api_key: opts.apiKey,
-        service: opts.serviceCode,
-        country,
-        operator: opts.operator,
-        maxPrice: formatSmsPriceParam(opts.maxPrice),
-      });
+      let body: string;
+      try {
+        body = await this.requestText({
+          action: 'getNumber',
+          api_key: opts.apiKey,
+          service: opts.serviceCode,
+          country,
+          operator: opts.operator,
+          maxPrice: formatSmsPriceParam(opts.maxPrice),
+        });
+      } catch (error) {
+        if (isTransientHeroSmsRequestError(error)) {
+          transientErrorCountries.push(country);
+          continue;
+        }
+        throw error;
+      }
       const match = /^ACCESS_NUMBER:([^:]+):(.+)$/.exec(body);
       if (match) {
         return {
@@ -60,7 +72,11 @@ export class HeroSmsProvider implements SmsProvider {
       throw new Error(`HeroSMS getNumber failed: ${body}`);
     }
 
-    throw new Error(`HeroSMS getNumber failed: NO_NUMBERS for countries ${noNumberCountries.join(', ')}`);
+    const failures = [
+      noNumberCountries.length > 0 ? `NO_NUMBERS for countries ${noNumberCountries.join(', ')}` : undefined,
+      transientErrorCountries.length > 0 ? `network errors for countries ${transientErrorCountries.join(', ')}` : undefined,
+    ].filter(Boolean).join('; ');
+    throw new Error(`HeroSMS getNumber failed: ${failures || 'no candidate countries were attempted'}`);
   }
 
   async pollCode(orderId: string, timeoutMs: number): Promise<string> {
@@ -89,12 +105,16 @@ export class HeroSmsProvider implements SmsProvider {
   }
 
   async release(orderId: string): Promise<void> {
-    await this.requestText({
-      action: 'setStatus',
-      api_key: this.apiKey,
-      id: orderId,
-      status: '8',
-    });
+    try {
+      await this.requestText({
+        action: 'setStatus',
+        api_key: this.apiKey,
+        id: orderId,
+        status: '8',
+      });
+    } catch (error) {
+      console.warn(`HeroSMS release failed for order ${orderId}: ${formatUnknownError(error)}`);
+    }
   }
 
   async markInvalid(_orderId: string): Promise<void> {
@@ -114,11 +134,22 @@ export class HeroSmsProvider implements SmsProvider {
         url.searchParams.set(key, value);
       }
     }
-    const response = await this.fetcher(url);
-    if (!response.ok) {
-      throw new Error(`HeroSMS request failed with HTTP ${response.status}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), HERO_SMS_REQUEST_TIMEOUT_MS);
+    try {
+      const response = await this.fetcher(url, { signal: controller.signal });
+      if (!response.ok) {
+        throw new Error(`HeroSMS request failed with HTTP ${response.status}`);
+      }
+      return (await response.text()).trim();
+    } catch (error) {
+      if (isAbortError(error)) {
+        throw new Error(`HeroSMS request timed out after ${HERO_SMS_REQUEST_TIMEOUT_MS}ms`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
-    return (await response.text()).trim();
   }
 
   private async chooseCountriesForPurchase(countries: string[], opts: SmsSettings): Promise<string[]> {
@@ -144,12 +175,13 @@ export class HeroSmsProvider implements SmsProvider {
   }
 
   private async getPrices(opts: SmsSettings): Promise<Record<string, number>> {
-    const body = await this.requestText({
-      action: 'getPrices',
-      api_key: opts.apiKey,
-      service: opts.serviceCode,
-    });
+    let body: string;
     try {
+      body = await this.requestText({
+        action: 'getPrices',
+        api_key: opts.apiKey,
+        service: opts.serviceCode,
+      });
       const parsed = parseHeroSmsPrices(body);
       const prices: Record<string, number> = {};
       for (const [country, services] of Object.entries(parsed)) {
@@ -162,7 +194,8 @@ export class HeroSmsProvider implements SmsProvider {
         }
       }
       return prices;
-    } catch {
+    } catch (error) {
+      console.warn(`HeroSMS price lookup failed; falling back to country order: ${formatUnknownError(error)}`);
       return {};
     }
   }
@@ -229,6 +262,24 @@ function toKnownSmsActivateCountryId(country: string): string | undefined {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
+function isTransientHeroSmsRequestError(error: unknown): boolean {
+  if (isAbortError(error)) return true;
+  if (!(error instanceof Error)) return false;
+  return error instanceof TypeError ||
+    error.message.includes('fetch failed') ||
+    error.message.includes('network') ||
+    error.message.includes('timed out') ||
+    /^HeroSMS request failed with HTTP (?:408|429|5\d\d)$/.test(error.message);
+}
+
+function formatUnknownError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 const SMS_ACTIVATE_COUNTRY_IDS: Record<string, string> = {

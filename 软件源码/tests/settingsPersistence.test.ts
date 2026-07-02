@@ -41,18 +41,18 @@ describe('settings persistence', () => {
     const store = new MemorySettingsStore();
     const orchestrator = new Orchestrator(undefined, undefined, undefined, store);
     const settings = orchestrator.getSettings();
-    settings.sms.apiKey = 'saved-key';
+    settings.sms.apiKey = 'savedkey123456789';
     settings.sms.maxPrice = 0.6;
 
     orchestrator.updateSettings(settings);
 
-    expect(store.saved?.sms.apiKey).toBe('saved-key');
+    expect(store.saved?.sms.apiKey).toBe('savedkey123456789');
     expect(store.saved?.sms.maxPrice).toBe(0.6);
   });
 
   it('schedules SmsHero cancellation when a test purchase starts', async () => {
     const settings = defaultSettings();
-    settings.sms.apiKey = 'sms-key';
+    settings.sms.apiKey = 'smskey1234567890';
     settings.sms.codeTimeoutMs = 20_000;
     settings.sms.cancelDelayMs = 180_000;
     const store = new MemorySettingsStore(settings);
