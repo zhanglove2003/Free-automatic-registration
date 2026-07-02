@@ -8,8 +8,13 @@ import { ElectronSettingsStore } from './storage/settingsStore.js';
 import { fetchHeroSmsCountries } from '../shared/smsCountries.js';
 import { fetchCheapestHeroSmsCountries, fetchHeroSmsBalance } from '../shared/smsHeroApi.js';
 
-export const orchestrator = new Orchestrator(undefined, undefined, undefined, new ElectronSettingsStore());
+let orchestrator: Orchestrator | undefined;
 const appRendererWebContentsIds = new Set<number>();
+
+function getOrchestrator(): Orchestrator {
+  orchestrator ??= new Orchestrator(undefined, undefined, undefined, new ElectronSettingsStore());
+  return orchestrator;
+}
 
 export function registerAppRendererWindow(window: BrowserWindow): void {
   const webContentsId = window.webContents.id;
@@ -20,8 +25,8 @@ export function registerAppRendererWindow(window: BrowserWindow): void {
 }
 
 export function registerIpc(): void {
-  ipcMain.handle('app:snapshot', async () => orchestrator.snapshot());
-  ipcMain.handle('settings:get', async () => orchestrator.getSettings());
+  ipcMain.handle('app:snapshot', async () => getOrchestrator().snapshot());
+  ipcMain.handle('settings:get', async () => getOrchestrator().getSettings());
   ipcMain.handle('cmd:saveSettings', async (_event, settings: AppSettings) => saveSettings(settings));
   ipcMain.handle('settings:update', async (_event, settings: AppSettings) => {
     return saveSettings(settings);
@@ -30,11 +35,11 @@ export function registerIpc(): void {
   ipcMain.handle('job:create', async (_event, input: CreateJobInput) => {
     return startJob(input);
   });
-  ipcMain.handle('sms:testPurchase', async () => orchestrator.testSmsPurchase());
+  ipcMain.handle('sms:testPurchase', async () => getOrchestrator().testSmsPurchase());
   ipcMain.handle('sms:countries', async () => fetchHeroSmsCountries());
-  ipcMain.handle('sms:autoCountries', async () => fetchCheapestHeroSmsCountries(orchestrator.getSettings().sms));
+  ipcMain.handle('sms:autoCountries', async () => fetchCheapestHeroSmsCountries(getOrchestrator().getSettings().sms));
   ipcMain.handle('sms:balance', async () => {
-    const settings = orchestrator.getSettings();
+    const settings = getOrchestrator().getSettings();
     if (!settings.sms.apiKey?.trim()) {
       return { configured: false };
     }
@@ -46,19 +51,19 @@ export function registerIpc(): void {
     if (!isBrowserHostWindow(window)) {
       throw new Error('App window not found for browser monitor');
     }
-    await orchestrator.openBrowserMonitor(taskId, window, normalizeMonitorBounds(bounds));
+    await getOrchestrator().openBrowserMonitor(taskId, window, normalizeMonitorBounds(bounds));
     await broadcastSnapshot();
   });
   ipcMain.handle('monitor:closeBrowser', async (_event, taskId: string) => {
-    await orchestrator.closeBrowserMonitor(taskId);
+    await getOrchestrator().closeBrowserMonitor(taskId);
     await broadcastSnapshot();
   });
   ipcMain.handle('monitor:destroyBrowser', async (_event, taskId: string) => {
-    await orchestrator.destroyBrowserMonitor(taskId);
+    await getOrchestrator().destroyBrowserMonitor(taskId);
     await broadcastSnapshot();
   });
   ipcMain.handle('monitor:captureBrowser', async (_event, taskId: string) => {
-    const bytes = await orchestrator.captureBrowser(taskId);
+    const bytes = await getOrchestrator().captureBrowser(taskId);
     return bytes ? `data:image/png;base64,${bytes.toString('base64')}` : undefined;
   });
   ipcMain.handle('utility:openBrowser', async (event, sessionId: string, url: string, bounds: BrowserMonitorBounds) => {
@@ -66,11 +71,11 @@ export function registerIpc(): void {
     if (!isBrowserHostWindow(window)) {
       throw new Error('App window not found for utility browser');
     }
-    await orchestrator.openUtilityBrowser(sessionId, normalizeUtilityBrowserUrl(url), window, normalizeMonitorBounds(bounds));
+    await getOrchestrator().openUtilityBrowser(sessionId, normalizeUtilityBrowserUrl(url), window, normalizeMonitorBounds(bounds));
     await broadcastSnapshot();
   });
   ipcMain.handle('utility:closeBrowser', async (_event, sessionId: string) => {
-    await orchestrator.closeUtilityBrowser(sessionId);
+    await getOrchestrator().closeUtilityBrowser(sessionId);
     await broadcastSnapshot();
   });
   ipcMain.handle('utility:attachBrowser', async (event, sessionId: string, bounds: BrowserMonitorBounds) => {
@@ -78,19 +83,19 @@ export function registerIpc(): void {
     if (!isBrowserHostWindow(window)) {
       throw new Error('App window not found for utility browser');
     }
-    await orchestrator.attachUtilityBrowser(sessionId, window, normalizeMonitorBounds(bounds));
+    await getOrchestrator().attachUtilityBrowser(sessionId, window, normalizeMonitorBounds(bounds));
   });
   ipcMain.handle('utility:goBack', async (_event, sessionId: string) => {
-    await orchestrator.goUtilityBrowserBack(sessionId);
+    await getOrchestrator().goUtilityBrowserBack(sessionId);
   });
   ipcMain.handle('utility:goForward', async (_event, sessionId: string) => {
-    await orchestrator.goUtilityBrowserForward(sessionId);
+    await getOrchestrator().goUtilityBrowserForward(sessionId);
   });
   ipcMain.handle('utility:reload', async (_event, sessionId: string) => {
-    await orchestrator.reloadUtilityBrowser(sessionId);
+    await getOrchestrator().reloadUtilityBrowser(sessionId);
   });
   ipcMain.handle('browser:setColorScheme', async (_event, scheme: 'light' | 'dark') => {
-    await orchestrator.setBrowserColorScheme(normalizeBrowserColorScheme(scheme));
+    await getOrchestrator().setBrowserColorScheme(normalizeBrowserColorScheme(scheme));
   });
   ipcMain.on('window:minimize', (event) => BrowserWindow.fromWebContents(event.sender)?.minimize());
   ipcMain.on('window:toggleMaximize', (event) => {
@@ -106,18 +111,18 @@ export function registerIpc(): void {
 }
 
 async function startJob(input: CreateJobInput) {
-  const tasks = await orchestrator.createJob(input);
+  const tasks = await getOrchestrator().createJob(input);
   await broadcastSnapshot();
   return tasks;
 }
 
 function saveSettings(settings: AppSettings): AppSettings {
-  orchestrator.updateSettings(settings);
-  return orchestrator.getSettings();
+  getOrchestrator().updateSettings(settings);
+  return getOrchestrator().getSettings();
 }
 
 export async function broadcastSnapshot(): Promise<void> {
-  const snapshot = await orchestrator.snapshot();
+  const snapshot = await getOrchestrator().snapshot();
   for (const window of BrowserWindow.getAllWindows()) {
     if (!isAppRendererWindow(window)) continue;
     window.webContents.send('app:snapshot', snapshot);
